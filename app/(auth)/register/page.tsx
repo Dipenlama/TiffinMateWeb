@@ -47,7 +47,7 @@ const SignupPage: React.FC = () => {
                     placeholder="Dipen lama"
                   />
                 </div>
-                
+
               </div>
 
               {/* Email Field */}
@@ -79,6 +79,7 @@ const SignupPage: React.FC = () => {
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
+                
               </div>
 
               {/* Retype Password Field */}
