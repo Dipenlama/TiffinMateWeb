@@ -5,9 +5,9 @@ export default function LoginForm() {
             Login Header  
             <div>
                 <label>Email</label>
-                <input type="emial"/>
+                <input type="email"/>
             </div>
-            
+
             <div>
                 <label>Password</label>
                 <input type="password"/>
