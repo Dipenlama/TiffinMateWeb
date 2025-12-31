@@ -47,6 +47,7 @@ const SignupPage: React.FC = () => {
                     placeholder="Dipen lama"
                   />
                 </div>
+                
               </div>
 
               {/* Email Field */}
