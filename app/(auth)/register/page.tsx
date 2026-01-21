@@ -44,7 +44,7 @@ const SignupPage: React.FC = () => {
                   <input
                     type="text"
                     className="w-full bg-[#F0F5FA] border-none rounded-xl py-4 px-4 text-gray-700 placeholder-gray-400 focus:ring-2 focus:ring-orange-500 outline-none transition-all"
-                    placeholder="Dipen lama"
+                    placeholder="Dipen Tamang"
                   />
                 </div>
               </div>
