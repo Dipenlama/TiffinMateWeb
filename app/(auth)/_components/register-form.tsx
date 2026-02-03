@@ -1,4 +1,5 @@
 export default function RegisterForm() {
+    
     return (
         <div className="mx-auto max-w-md p-4 border rounded">
             Register Header  
