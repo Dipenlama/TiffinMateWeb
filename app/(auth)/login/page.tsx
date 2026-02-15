@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, Utensils } from 'lucide-react';
-import router from 'next/router';
 import { useRouter } from 'next/navigation';
 
 
@@ -12,9 +11,29 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Logging in with:", { email, password });
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5050'}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const json = await res.json();
+      if (res.ok && json.token) {
+        localStorage.setItem('token', json.token);
+        // optional: store user
+        localStorage.setItem('user', JSON.stringify(json.data || {}));
+        const role = json?.data?.role || 'user';
+        if (role === 'admin') router.push('/admin/users');
+        else router.push('/dashboard');
+      } else {
+        alert(json.message || 'Login failed');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Login failed');
+    }
   };
 
   return (
@@ -69,9 +88,9 @@ const LoginPage: React.FC = () => {
             <div>
               <div className="flex justify-between mb-1">
                 <label className="block text-sm font-medium text-gray-700">Password</label>
-                <a href="#" className="text-sm font-medium text-orange-600 hover:text-orange-500">
+                <button type="button" onClick={() => router.push('/forgot-password')} className="text-sm font-medium text-orange-600 hover:text-orange-500">
                   Forgot password?
-                </a>
+                </button>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -97,7 +116,6 @@ const LoginPage: React.FC = () => {
 
             {/* Login Button */}
             <button
-            onClick={() => router.push('/dashboard')}
               type="submit"
               className="w-full bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors shadow-lg shadow-orange-200"
             >

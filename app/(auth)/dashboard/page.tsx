@@ -48,7 +48,7 @@ const Header = () => (
 function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
-  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+  const [isDark, setIsDark] = useState(() => (typeof document !== 'undefined' ? document.documentElement.classList.contains("dark") : false));
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -58,9 +58,11 @@ function ProfileMenu() {
     return () => document.removeEventListener("click", onDoc);
   }, []);
 
-  const toggleTheme = () => {
-    document.documentElement.classList.toggle("dark");
-    setIsDark(document.documentElement.classList.contains("dark"));
+    const toggleTheme = () => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle("dark");
+      setIsDark(document.documentElement.classList.contains("dark"));
+    }
     setOpen(false);
   };
 
@@ -133,7 +135,7 @@ const Card = ({ title, subtitle, img, badge }: { title: string; subtitle?: strin
 
 const Categories = () => (
   <div className="max-w-7xl mx-auto px-6 py-8">
-    <h3 className="text-lg font-semibold mb-4">Order.uk Popular Categories</h3>
+    <h3 className="text-lg font-semibold mb-4">Order Popular Categories</h3>
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
       {[
         { name: "Burgers & Fast food", img: food1.src },
@@ -158,7 +160,7 @@ const Categories = () => (
 const Deals = () => (
   <section className="max-w-7xl mx-auto px-6 py-6">
     <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold">Up to -40% 🎉 Order.uk exclusive deals</h3>
+      <h3 className="text-lg font-semibold">Up to -40% 🎉 Order exclusive deals</h3>
       <div className="flex gap-3 text-sm text-neutral-600">
         <button className="px-3 py-1 rounded-full border">Vegan</button>
         <button className="px-3 py-1 rounded-full border">Sushi</button>
