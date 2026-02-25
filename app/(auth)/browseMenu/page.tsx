@@ -7,7 +7,7 @@ export default function BrowsePage() {
         <h1 className="text-2xl font-bold mb-2">Browse Menu (Dummy)</h1>
         <p className="text-neutral-600">This is a placeholder page for the Browse Menu. Replace with the real menu later.</p>
         <div className="mt-6">
-          <Link href="/" className="text-orange-600 hover:underline">Back to Home</Link>
+          <Link href="/dashboard" className="text-orange-600 hover:underline">Back to Home</Link>
         </div>
       </div>
     </div>
