@@ -1,4 +1,12 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5050/api';
+const API_ORIGIN = (process.env.NEXT_PUBLIC_API_ORIGIN || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5050').trim().replace(/\/$/, '');
+const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX || '/api').trim();
+export const API_BASE = `${API_ORIGIN}${API_PREFIX.startsWith('/') ? API_PREFIX : '/' + API_PREFIX}`;
+
+function toggleApiPrefix(base: string) {
+  // Allows retrying with or without /api in case backend path differs
+  if (base.endsWith('/api')) return base.replace(/\/api$/, '');
+  return `${base}/api`;
+}
 
 async function handleResp(resp: Response) {
   if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).message || resp.statusText);
@@ -6,7 +14,7 @@ async function handleResp(resp: Response) {
 }
 
 export async function postForgotPassword(email: string) {
-  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
@@ -15,7 +23,7 @@ export async function postForgotPassword(email: string) {
 }
 
 export async function postResetPassword(token: string, password: string) {
-  const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token, password }),
@@ -24,7 +32,7 @@ export async function postResetPassword(token: string, password: string) {
 }
 
 export async function postLogin(email: string, password: string) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
+  const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -33,23 +41,23 @@ export async function postLogin(email: string, password: string) {
 }
 
 export async function fetchAdminUsers(token: string, page = 1, limit = 10) {
-  const url = `${API_BASE}/api/admin/users?page=${page}&limit=${limit}`;
+  const url = `${API_BASE}/admin/users?page=${page}&limit=${limit}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   return handleResp(res);
 }
 
 export async function deleteAdminUser(token: string, id: string) {
-  const res = await fetch(`${API_BASE}/api/admin/users/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${API_BASE}/admin/users/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
   return res;
 }
 
 export async function fetchUserById(token: string, id: string) {
-  const res = await fetch(`${API_BASE}/api/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(`${API_BASE}/admin/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
   return res.json();
 }
 
 export async function updateUserById(token: string, id: string, data: any) {
-  const res = await fetch(`${API_BASE}/api/admin/users/${id}`, {
+  const res = await fetch(`${API_BASE}/admin/users/${id}`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -81,14 +89,22 @@ export async function createBooking(payload: any, idempotencyKey?: string) {
   const headers: any = { 'Content-Type': 'application/json' };
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   try {
-    const res = await fetch(`${API_BASE}/bookings`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data: json };
+    const attempt = async (base: string) => {
+      const res = await fetch(`${base}/bookings`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data: json };
+    };
+
+    const first = await attempt(API_BASE);
+    if (first.status === 404) {
+      const alt = await attempt(toggleApiPrefix(API_BASE));
+      return alt;
+    }
+    return first;
   } catch (e) {
     return { ok: false, status: 0, data: { error: String(e) } };
   }
@@ -96,14 +112,22 @@ export async function createBooking(payload: any, idempotencyKey?: string) {
 
 export async function createPaymentSession(bookingId: string) {
   try {
-    const res = await fetch(`${API_BASE}/payments/create-checkout-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ bookingId }),
-    });
-    const json = await res.json().catch(() => ({}));
-    return { ok: res.ok, status: res.status, data: json };
+    const attempt = async (base: string) => {
+      const res = await fetch(`${base}/payments/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data: json };
+    };
+
+    const first = await attempt(API_BASE);
+    if (first.status === 404) {
+      const alt = await attempt(toggleApiPrefix(API_BASE));
+      return alt;
+    }
+    return first;
   } catch (e) {
     return { ok: false, status: 0, data: { error: String(e) } };
   }

@@ -98,7 +98,7 @@ export default function MenuItemPage() {
       <div className="max-w-4xl mx-auto bg-white rounded-lg p-6 shadow">
         <div className="flex gap-6">
           <div className="w-1/3">
-            <img src={item.image || "/assets/images/placeholder.jpg"} alt={item.name} className="w-full h-48 object-cover rounded" />
+            <img src={item.image || "/assets/images/placeholder.svg"} alt={item.name} className="w-full h-48 object-cover rounded" />
           </div>
           <div className="flex-1">
             <h1 className="text-2xl font-semibold text-neutral-900">{item.name}</h1>

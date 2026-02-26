@@ -115,7 +115,7 @@ export default function MenuPage() {
               {visible.map((it) => (
                 <article key={it.id} className="bg-white rounded-xl card-shadow hover:shadow-lg transform hover:-translate-y-1 transition overflow-hidden">
                   <div className="h-44 bg-neutral-100 overflow-hidden relative">
-                    <img src={`/assets/images/${(it.id||'placeholder').toString().split('-')[0]}.jpg`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src='/assets/images/placeholder.jpg'}} alt={it.title} className="w-full h-full object-cover" />
+                    <img src={`/assets/images/${(it.id||'placeholder').toString().split('-')[0]}.jpg`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src='/assets/images/placeholder.svg'}} alt={it.title} className="w-full h-full object-cover" />
                     <div className="absolute top-3 left-3 bg-white/80 text-xs px-2 py-1 rounded">{it.category}</div>
                   </div>
                   <div className="p-5">
