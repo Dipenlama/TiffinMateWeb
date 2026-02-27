@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import RectangleImg from "./assets/images/Rectangle.png";
 import food1 from "./assets/images/food1.png";
@@ -12,34 +11,6 @@ import food5 from "./assets/images/food5.png";
 import food6 from "./assets/images/food6.png";
 import food7 from "./assets/images/food7.png";
 import thukpa from "./assets/images/thukpa.png";
-
-const Header: React.FC = () => {
-  const router = useRouter();
-  return (
-    <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3">
-          <img src={RectangleImg.src} alt="TiffinMate logo" className="w-12 h-12 object-contain" />
-          <div>
-            <div className="font-semibold text-lg">TiffinMate</div>
-            <div className="text-xs text-neutral-600">Daily Treats</div>
-          </div>
-        </div>
-      </div>
-
-      <nav className="hidden md:flex items-center gap-8 text-sm text-neutral-700">
-        <Link href="/dashboard" className="text-orange-600 font-medium">Home</Link>
-        <Link href="/menu">Menu</Link>
-        <Link href="/orders">Orders</Link>
-      </nav>
-
-      <div className="flex items-center gap-3">
-        <button onClick={() => router.push('/login')} className="px-3 py-1 text-sm">Sign in</button>
-        <button onClick={() => router.push('/login')} className="px-3 py-1 bg-orange-600 text-white rounded-full text-sm">Sign up</button>
-      </div>
-    </header>
-  );
-};
 
 const Card = ({ title, subtitle, img, badge }: { title: string; subtitle?: string; img: string; badge?: string }) => (
   <div className="bg-white rounded-xl overflow-hidden shadow-md relative">
@@ -128,7 +99,6 @@ const Hero: React.FC = () => {
 const HomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans">
-      <Header />
       <main>
         <Hero />
         <Deals />

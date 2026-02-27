@@ -51,8 +51,16 @@ export default function ConfirmPage() {
       try {
         // dynamic import of API helpers from lib/api
         const api: any = await import('../../../lib/api');
+
+        // Normalize package fields to satisfy backend validation
+        const allowedPackages = ['Veg','Non-Veg','Mixed','Premium'];
+        const pickedPackage = allowedPackages.includes(draft.package) ? draft.package : allowedPackages.includes(draft.packageName) ? draft.packageName : 'Veg';
+        const packageName = draft.packageName || draft.package || `${pickedPackage} Plan`;
+
         const payload = {
           ...draft,
+          package: pickedPackage,
+          packageName,
           frequency: draft.frequency || 'once',
           day: draft.day || 'Mon',
           time: draft.time || 'Lunch',

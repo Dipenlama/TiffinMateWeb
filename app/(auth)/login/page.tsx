@@ -22,10 +22,20 @@ const LoginPage: React.FC = () => {
       const json = await res.json();
       if (res.ok && json.token) {
         localStorage.setItem('token', json.token);
+        // also set cookies so middleware can detect auth and role for redirects
+        try {
+          const maxAge = 7 * 24 * 60 * 60; // 7 days
+          document.cookie = `auth_token=${json.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+          document.cookie = `token=${json.token}; path=/; max-age=${maxAge}; SameSite=Lax`;
+          const roleVal = json?.data?.role || 'user';
+          document.cookie = `role=${roleVal}; path=/; max-age=${maxAge}; SameSite=Lax`;
+        } catch (e) {
+          console.warn('Could not set auth cookie', e);
+        }
         // optional: store user
         localStorage.setItem('user', JSON.stringify(json.data || {}));
         const role = json?.data?.role || 'user';
-        if (role === 'admin') router.push('/admin/users');
+        if (role === 'admin') router.push('/admin/dashboard');
         else router.push('/dashboard');
       } else {
         alert(json.message || 'Login failed');

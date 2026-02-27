@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "./_providers/cart-provider";
-import Link from 'next/link';
+import Navbar from "./_components/navbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,23 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html>
       <body>
-        <header className="bg-white border-b border-neutral-100">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="text-xl font-bold text-neutral-900">Tiffin Mate</Link>
-              <nav aria-label="Main navigation" className="hidden md:flex gap-4 text-neutral-700">
-                <Link href="/menu" className="hover:text-neutral-900">Menu</Link>
-                <Link href="/browse" className="hover:text-neutral-900">Browse</Link>
-                <Link href="/packages/confirm" className="hover:text-neutral-900">Bookings</Link>
-              </nav>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Link href="/cart" className="px-3 py-1 rounded-full bg-orange-600 text-white text-sm">Cart</Link>
-              <Link href="/login" className="text-sm text-neutral-700">Login</Link>
-            </div>
-          </div>
-        </header>
+        <Navbar />
         <CartProvider>
           {children}
         </CartProvider>

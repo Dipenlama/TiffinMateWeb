@@ -1,12 +1,4 @@
-const API_ORIGIN = (process.env.NEXT_PUBLIC_API_ORIGIN || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5050').trim().replace(/\/$/, '');
-const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX || '/api').trim();
-export const API_BASE = `${API_ORIGIN}${API_PREFIX.startsWith('/') ? API_PREFIX : '/' + API_PREFIX}`;
-
-function toggleApiPrefix(base: string) {
-  // Allows retrying with or without /api in case backend path differs
-  if (base.endsWith('/api')) return base.replace(/\/api$/, '');
-  return `${base}/api`;
-}
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:5050/api';
 
 async function handleResp(resp: Response) {
   if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).message || resp.statusText);
@@ -87,24 +79,21 @@ export async function createOrder(payload: { items: any[]; address: string; paym
 
 export async function createBooking(payload: any, idempotencyKey?: string) {
   const headers: any = { 'Content-Type': 'application/json' };
+  // Attach bearer token when available (frontend stored token)
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
   if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   try {
-    const attempt = async (base: string) => {
-      const res = await fetch(`${base}/bookings`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
-      return { ok: res.ok, status: res.status, data: json };
-    };
-
-    const first = await attempt(API_BASE);
-    if (first.status === 404) {
-      const alt = await attempt(toggleApiPrefix(API_BASE));
-      return alt;
-    }
-    return first;
+    const res = await fetch(`${API_BASE}/bookings`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data: json };
   } catch (e) {
     return { ok: false, status: 0, data: { error: String(e) } };
   }
@@ -112,22 +101,14 @@ export async function createBooking(payload: any, idempotencyKey?: string) {
 
 export async function createPaymentSession(bookingId: string) {
   try {
-    const attempt = async (base: string) => {
-      const res = await fetch(`${base}/payments/create-checkout-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId }),
-      });
-      const json = await res.json().catch(() => ({}));
-      return { ok: res.ok, status: res.status, data: json };
-    };
-
-    const first = await attempt(API_BASE);
-    if (first.status === 404) {
-      const alt = await attempt(toggleApiPrefix(API_BASE));
-      return alt;
-    }
-    return first;
+    const res = await fetch(`${API_BASE}/payments/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ bookingId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data: json };
   } catch (e) {
     return { ok: false, status: 0, data: { error: String(e) } };
   }
