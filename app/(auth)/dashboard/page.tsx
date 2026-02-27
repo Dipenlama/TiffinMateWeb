@@ -1,18 +1,8 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
-import {
-  LayoutDashboard,
-  ShoppingBag,
-  History,
-  Settings,
-  LogOut,
-  User,
-  Moon,
-  Edit2,
-  Sun,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
 import RectangleImg from "../../assets/images/Rectangle.png";
 import food1 from "../../assets/images/food1.png";
 import food2 from "../../assets/images/food2.png";
@@ -22,81 +12,6 @@ import food5 from "../../assets/images/food5.png";
 import food6 from "../../assets/images/food6.png";
 import food7 from "../../assets/images/food7.png";
 import thukpa from "../../assets/images/thukpa.png";
-import { useRouter } from "next/navigation";
-
-const Header = () => (
-  <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-3">
-        <img src={RectangleImg.src} alt="TiffinMate logo" className="w-12 h-12 object-contain" />
-        <div>
-          <div className="font-semibold text-lg">TiffinMate</div>
-          <div className="text-xs text-neutral-600">Daily Treats</div>
-        </div>
-      </div>
-    </div>
-      <nav className="hidden md:flex items-center gap-8 text-sm text-neutral-700">
-      <Link href="/dashboard" className="text-orange-600 font-medium">Home</Link>
-      <Link href="/menu">Browse Menu</Link>
-      <Link href="/special-offers">Special Offers</Link>
-    </nav>
-    <div className="flex items-center gap-4">
-      <ProfileMenu />
-    </div>
-  </header>
-);
-
-function ProfileMenu() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [isDark, setIsDark] = useState(() => (typeof document !== 'undefined' ? document.documentElement.classList.contains("dark") : false));
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("click", onDoc);
-    return () => document.removeEventListener("click", onDoc);
-  }, []);
-
-    const toggleTheme = () => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle("dark");
-      setIsDark(document.documentElement.classList.contains("dark"));
-    }
-    setOpen(false);
-  };
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="w-10 h-10 rounded-full bg-orange-600 text-white flex items-center justify-center shadow"
-      >
-        <User size={16} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 mt-2 w-44 bg-white rounded-md shadow-lg ring-1 ring-black/5 py-1 z-50">
-          <button className="w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-center gap-2 text-sm" onClick={() => { setOpen(false); /* navigate to settings */ }}>
-            <Settings size={14} /> Settings
-          </button>
-          <button className="w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-center gap-2 text-sm" onClick={toggleTheme}>
-            {isDark ? <Sun size={14} /> : <Moon size={14} />} Theme
-          </button>
-          <button className="w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-center gap-2 text-sm" onClick={() => { setOpen(false); /* navigate to edit profile */ }}>
-            <Edit2 size={14} /> Edit Profile
-          </button>
-          <div className="border-t mt-1" />
-          <button className="w-full text-left px-3 py-2 hover:bg-neutral-50 flex items-center gap-2 text-sm text-rose-600" onClick={() => { console.log('logout'); setOpen(false); }}>
-            <LogOut size={14} /> Logout
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 const Hero = () => (
   <section className="max-w-7xl mx-auto px-6 py-10">
@@ -234,7 +149,6 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans">
-      <Header />
       <main>
         <Hero />
         <Deals />
@@ -290,16 +204,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-
-export function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html>
-      <body>
-        <header style={{ padding: 12, borderBottom: '1px solid #eee' }}>
-          <div style={{ fontWeight: 600 }}>Tiffin Mate</div>
-        </header>
-        {children}
-      </body>
-    </html>
-  );
-}

@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { fetchAdminUsers, deleteAdminUser } from '../../../lib/api';
+import { fetchAdminUsers, deleteAdminUser, API_BASE } from '../../../lib/api';
 
 export default function AdminUsersPage() {
   const [usersData, setUsersData] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState({ username: '', email: '', password: '', confirmPassword: '', role: 'user' });
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
 
   useEffect(() => {
@@ -40,6 +41,43 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function handleCreate() {
+    if (!token) {
+      alert('Not authenticated');
+      return;
+    }
+    const trimmedPassword = userForm.password.trim();
+    const trimmedConfirm = (userForm.confirmPassword || '').trim();
+    if (!trimmedPassword || trimmedPassword !== trimmedConfirm) {
+      alert('Passwords do not match');
+      return;
+    }
+    try {
+      const payload = {
+        username: userForm.username.trim(),
+        email: userForm.email.trim(),
+        password: trimmedPassword,
+        confirmPassword: trimmedConfirm || trimmedPassword,
+        role: userForm.role === 'admin' ? 'admin' : 'user',
+      };
+      const res = await fetch(`${API_BASE}/admin/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(json?.message || 'Failed to create user');
+        return;
+      }
+      setMessage('User created');
+      setUserForm({ username: '', email: '', password: '', confirmPassword: '', role: 'user' });
+      load();
+    } catch (e) {
+      alert('Failed to create user');
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm('Delete this user?')) return;
     try {
@@ -58,6 +96,38 @@ export default function AdminUsersPage() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-4">Users</h1>
+      <div className="mb-6 border rounded-lg p-4 bg-white shadow-sm">
+        <h2 className="font-semibold mb-3">Create User</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-neutral-600">Username</label>
+            <input value={userForm.username} onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-neutral-600">Email</label>
+            <input type="email" value={userForm.email} onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-neutral-600">Password</label>
+            <input type="password" value={userForm.password} onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-neutral-600">Confirm Password</label>
+            <input type="password" value={userForm.confirmPassword} onChange={(e) => setUserForm((f) => ({ ...f, confirmPassword: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label className="text-xs text-neutral-600">Role</label>
+            <select value={userForm.role} onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button onClick={handleCreate} className="bg-orange-600 text-white px-4 py-2 rounded text-sm">Create</button>
+          <button onClick={() => setUserForm({ username: '', email: '', password: '', confirmPassword: '', role: 'user' })} className="px-4 py-2 rounded border text-sm">Clear</button>
+        </div>
+      </div>
       {loading && <p>Loading...</p>}
       {!usersData && !loading && <p>No users or access denied.</p>}
       {usersData && (

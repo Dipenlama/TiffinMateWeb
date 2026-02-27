@@ -17,7 +17,19 @@ export default function CheckoutPage() {
     setSubmitting(true);
     try {
       // create booking on backend using createBooking helper
-      const draft = { items, total: (items || []).reduce((s:any,it:any)=>s + ((it.price||0) * (it.qty||1)), 0), day: 'Mon', time: 'Lunch', frequency: 'once', address, draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}` };
+      const allowedPackages = ['Veg','Non-Veg','Mixed','Premium'];
+      const defaultPackage = allowedPackages[0];
+      const draft = {
+        items,
+        total: (items || []).reduce((s:any,it:any)=>s + ((it.price||0) * (it.qty||1)), 0),
+        day: 'Mon',
+        time: 'Lunch',
+        frequency: 'once',
+        package: defaultPackage,
+        packageName: `${defaultPackage} Plan`,
+        address,
+        draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+      };
       const res: any = await createBooking(draft as any, draft.draftId);
       const bookingId = res?.data?._id || res?.data?.id || res?.data;
       if (!res.ok) {
