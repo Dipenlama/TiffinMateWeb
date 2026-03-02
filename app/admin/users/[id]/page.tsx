@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchUserById } from '../../../lib/api';
+import { fetchUserById } from '@/lib/api';
 
 export default function UserDetailPage() {
   const params = useParams();
-  const id = params?.id;
+  const id = Array.isArray(params?.id) ? params.id[0] : (params?.id || '');
   const [user, setUser] = useState<any>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
   const router = useRouter();

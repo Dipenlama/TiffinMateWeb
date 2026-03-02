@@ -9,6 +9,7 @@ export default function UserEditPage() {
   const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [user, setUser] = useState<any>(null);
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [role, setRole] = useState('user');
   const [message, setMessage] = useState<string | null>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
@@ -20,13 +21,24 @@ export default function UserEditPage() {
       if (typeof window !== 'undefined') window.location.href = '/login';
       return;
     }
-    fetchUserById(token, id).then((j) => { const d = j.data || j; setUser(d); setUsername(d.username); setRole(d.role || 'user'); }).catch(() => setUser(null));
-  }, [id]);
+    fetchUserById(token, id).then((j) => {
+      if (!j.ok) { setUser(null); return; }
+      const d = j.data?.data || j.data || j;
+      setUser(d);
+      setUsername(d.username || '');
+      setEmail(d.email || '');
+      setRole(d.role || 'user');
+    }).catch(() => setUser(null));
+  }, [id, token]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await updateUserById(token, id!, { username, role });
+      const res = await updateUserById(token, id!, { username, email, role });
+      if (!res.ok) {
+        alert(res?.data?.message || 'Save failed');
+        return;
+      }
       setMessage('Saved');
       setTimeout(() => router.push(`/admin/users/${id}`), 700);
     } catch (err) {
@@ -46,6 +58,10 @@ export default function UserEditPage() {
           <div>
             <label className="block text-sm">Username</label>
             <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full border px-3 py-2 rounded" />
+          </div>
+          <div>
+            <label className="block text-sm">Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border px-3 py-2 rounded" />
           </div>
           <div>
             <label className="block text-sm">Role</label>

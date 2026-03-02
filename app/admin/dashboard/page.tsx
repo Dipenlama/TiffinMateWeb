@@ -35,10 +35,13 @@ type Booking = {
 type MenuItem = {
     _id?: string;
     id?: string;
-    title: string;
+    title?: string; // legacy
+    name?: string;
     description?: string;
+    image?: string;
     price?: number;
     category?: string;
+    available?: boolean;
 };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5050/api").replace(/\/$/, "");
@@ -89,10 +92,12 @@ export default function AdminDashboardPage() {
     const [itemsLoading, setItemsLoading] = useState(false);
     const [itemsError, setItemsError] = useState<string | null>(null);
 
-    const [itemForm, setItemForm] = useState<MenuItem>({ title: "", description: "", price: 0, category: "" });
+    const [itemForm, setItemForm] = useState<MenuItem>({ name: "", description: "", price: 0, category: "", available: true, image: "" });
+    const [itemImagePreview, setItemImagePreview] = useState<string | undefined>(undefined);
     const [savingItem, setSavingItem] = useState(false);
 
     const [userForm, setUserForm] = useState<NewUser>({ username: "", email: "", password: "", confirmPassword: "", role: "user" });
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [savingUser, setSavingUser] = useState(false);
 
     useEffect(() => {
@@ -122,6 +127,18 @@ export default function AdminDashboardPage() {
             : [];
         setUsers(list as User[]);
         setUsersLoading(false);
+    };
+
+    const startEditUser = (u: User) => {
+        setEditingUserId(u._id);
+        setUserForm({
+            username: u.username || "",
+            email: u.email || "",
+            password: "",
+            confirmPassword: "",
+            role: u.role || "user",
+        });
+        setTab("users");
     };
 
     const deleteUser = async (id: string) => {
@@ -180,10 +197,12 @@ export default function AdminDashboardPage() {
         if (!token) return;
         setSavingItem(true);
         const payload = {
-            title: itemForm.title,
-            description: itemForm.description,
+            name: itemForm.name?.trim() || "",
+            description: itemForm.description?.trim() || "",
+            image: (itemForm.image || itemImagePreview || "").trim() || undefined,
             price: Number(itemForm.price) || 0,
             category: itemForm.category || "General",
+            available: itemForm.available !== false,
         };
         const path = itemForm._id ? `/admin/items/${itemForm._id}` : "/admin/items";
         const method = itemForm._id ? "PUT" : "POST";
@@ -192,13 +211,23 @@ export default function AdminDashboardPage() {
             alert("Failed to save item");
         } else {
             loadItems();
-            setItemForm({ title: "", description: "", price: 0, category: "" });
+            setItemForm({ name: "", description: "", price: 0, category: "", available: true, image: "" });
+            setItemImagePreview(undefined);
         }
         setSavingItem(false);
     };
 
     const editItem = (itm: MenuItem) => {
-        setItemForm({ ...itm, price: itm.price ?? 0, category: itm.category || "" });
+        setItemForm({
+            ...itm,
+            name: itm.name || itm.title || itm.id || "",
+            description: itm.description || "",
+            image: itm.image || "",
+            price: itm.price ?? 0,
+            category: itm.category || "",
+            available: itm.available !== false,
+        } as any);
+        setItemImagePreview(itm.image);
         setTab("items");
     };
 
@@ -272,7 +301,8 @@ export default function AdminDashboardPage() {
                                                     <td className="px-4 py-3 text-neutral-700">{u.email}</td>
                                                     <td className="px-4 py-3 text-neutral-700">{u.role || "user"}</td>
                                                     <td className="px-4 py-3 text-neutral-600">{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-right flex justify-end gap-3">
+                                                        <button onClick={() => startEditUser(u)} className="text-sm text-orange-600 hover:underline">Edit</button>
                                                         <button onClick={() => deleteUser(u._id)} className="text-sm text-red-600 hover:underline">Delete</button>
                                                     </td>
                                                 </tr>
@@ -284,7 +314,7 @@ export default function AdminDashboardPage() {
                         </div>
 
                         <div className="bg-white rounded-xl border border-neutral-200 shadow-sm p-4">
-                            <h3 className="font-semibold mb-3">Create User</h3>
+                            <h3 className="font-semibold mb-3">{editingUserId ? "Edit User" : "Create User"}</h3>
                             <div className="space-y-3">
                                 <div>
                                     <label className="text-xs text-neutral-600">Email</label>
@@ -313,29 +343,52 @@ export default function AdminDashboardPage() {
                                     <button
                                         onClick={async () => {
                                             if (!token) return;
-                                            if (!userForm.password || userForm.password !== userForm.confirmPassword) {
-                                                alert('Passwords do not match');
-                                                return;
+                                            const trimmedPassword = (userForm.password || "").trim();
+                                            const trimmedConfirm = (userForm.confirmPassword || "").trim();
+
+                                            if (!editingUserId) {
+                                                if (!trimmedPassword || trimmedPassword !== trimmedConfirm) {
+                                                    alert('Passwords do not match');
+                                                    return;
+                                                }
+                                            } else if (trimmedPassword || trimmedConfirm) {
+                                                if (trimmedPassword !== trimmedConfirm) {
+                                                    alert('Passwords do not match');
+                                                    return;
+                                                }
                                             }
+
                                             setSavingUser(true);
-                                            const res = await apiSend('/admin/users', token, 'POST', {
+                                            const payload: any = {
                                                 username: userForm.username.trim(),
                                                 email: userForm.email.trim(),
-                                                password: userForm.password,
-                                                confirmPassword: userForm.confirmPassword,
                                                 role: userForm.role === 'admin' ? 'admin' : 'user',
-                                            });
+                                            };
+                                            if (trimmedPassword) {
+                                                payload.password = trimmedPassword;
+                                                payload.confirmPassword = trimmedConfirm || trimmedPassword;
+                                            }
+
+                                            const path = editingUserId ? `/admin/users/${editingUserId}` : '/admin/users';
+                                            const method = editingUserId ? 'PUT' : 'POST';
+                                            const res = await apiSend(path, token, method, payload);
                                             setSavingUser(false);
-                                            if (!res.ok) { alert('Failed to create user'); return; }
+                                            if (!res.ok) { alert('Failed to save user'); return; }
                                             setUserForm({ username: '', email: '', password: '', confirmPassword: '', role: 'user' });
+                                            setEditingUserId(null);
                                             loadUsers();
                                         }}
                                         disabled={savingUser}
                                         className="flex-1 bg-orange-600 text-white rounded px-3 py-2 text-sm"
                                     >
-                                        {savingUser ? 'Creating…' : 'Create'}
+                                        {savingUser ? (editingUserId ? 'Saving…' : 'Creating…') : editingUserId ? 'Update' : 'Create'}
                                     </button>
-                                    <button onClick={() => setUserForm({ username: '', email: '', password: '', confirmPassword: '', role: 'user' })} className="px-3 py-2 text-sm border rounded">Clear</button>
+                                    <button
+                                        onClick={() => { setUserForm({ username: '', email: '', password: '', confirmPassword: '', role: 'user' }); setEditingUserId(null); }}
+                                        className="px-3 py-2 text-sm border rounded"
+                                    >
+                                        Clear
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -406,18 +459,20 @@ export default function AdminDashboardPage() {
                                     <table className="min-w-full text-sm">
                                         <thead className="bg-neutral-100 text-neutral-700">
                                             <tr>
-                                                <th className="text-left px-4 py-3">Title</th>
+                                                <th className="text-left px-4 py-3">Name</th>
                                                 <th className="text-left px-4 py-3">Category</th>
                                                 <th className="text-left px-4 py-3">Price</th>
+                                                <th className="text-left px-4 py-3">Available</th>
                                                 <th className="text-right px-4 py-3">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {items.map((it) => (
                                                 <tr key={it._id || it.id} className="border-t border-neutral-100">
-                                                    <td className="px-4 py-3 font-medium">{it.title || it.id}</td>
+                                                    <td className="px-4 py-3 font-medium">{it.name || it.title || it.id}</td>
                                                     <td className="px-4 py-3 text-neutral-700">{it.category || "—"}</td>
                                                     <td className="px-4 py-3 text-neutral-900">₹{Number(it.price || 0).toFixed(2)}</td>
+                                                    <td className="px-4 py-3 text-neutral-700">{it.available === false ? "No" : "Yes"}</td>
                                                     <td className="px-4 py-3 text-right flex justify-end gap-2">
                                                         <button onClick={() => editItem(it)} className="text-sm text-orange-600 hover:underline">Edit</button>
                                                         <button onClick={() => deleteItem(it._id || it.id)} className="text-sm text-red-600 hover:underline">Delete</button>
@@ -434,26 +489,65 @@ export default function AdminDashboardPage() {
                             <h3 className="font-semibold mb-3">{itemForm._id ? "Edit Item" : "Add Item"}</h3>
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs text-neutral-600">Title</label>
-                                    <input value={itemForm.title} onChange={(e) => setItemForm((f) => ({ ...f, title: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" />
+                                    <label className="text-xs text-neutral-600">Name</label>
+                                    <input value={itemForm.name} onChange={(e) => setItemForm((f) => ({ ...f, name: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" placeholder="Paneer Butter Masala" />
                                 </div>
                                 <div>
                                     <label className="text-xs text-neutral-600">Description</label>
                                     <textarea value={itemForm.description} onChange={(e) => setItemForm((f) => ({ ...f, description: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" rows={3} />
                                 </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs text-neutral-600">Image</label>
+                                    <div className="text-xs text-neutral-500">Choose a file from your computer to send as the item image.</div>
+                                    <div>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="text-sm"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) { setItemImagePreview(undefined); setItemForm((f) => ({ ...f, image: "" })); return; }
+                                                // Guard against very large files that could trigger 413 when sent as data URLs
+                                                const maxBytes = 1 * 1024 * 1024; // 1MB
+                                                if (file.size > maxBytes) {
+                                                    alert('Image too large. Please pick a file under 1MB.');
+                                                    return;
+                                                }
+                                                const reader = new FileReader();
+                                                reader.onload = () => {
+                                                    const dataUrl = reader.result as string;
+                                                    setItemImagePreview(dataUrl);
+                                                    setItemForm((f) => ({ ...f, image: dataUrl }));
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }}
+                                        />
+                                        {(itemImagePreview || itemForm.image) && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={itemImagePreview || itemForm.image} alt="preview" className="mt-2 h-24 w-32 object-cover rounded" />
+                                        )}
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="text-xs text-neutral-600">Price</label>
-                                        <input type="number" value={itemForm.price ?? 0} onChange={(e) => setItemForm((f) => ({ ...f, price: Number(e.target.value) }))} className="w-full border rounded px-3 py-2 mt-1" />
+                                        <input type="number" step="0.01" value={itemForm.price ?? 0} onChange={(e) => setItemForm((f) => ({ ...f, price: Number(e.target.value) }))} className="w-full border rounded px-3 py-2 mt-1" placeholder="6.5" />
                                     </div>
                                     <div>
                                         <label className="text-xs text-neutral-600">Category</label>
-                                        <input value={itemForm.category || ""} onChange={(e) => setItemForm((f) => ({ ...f, category: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" />
+                                        <input value={itemForm.category || ""} onChange={(e) => setItemForm((f) => ({ ...f, category: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" placeholder="Vegetarian" />
                                     </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-neutral-600">Available</label>
+                                    <select value={itemForm.available ? "true" : "false"} onChange={(e) => setItemForm((f) => ({ ...f, available: e.target.value === "true" }))} className="w-full border rounded px-3 py-2 mt-1">
+                                        <option value="true">Yes</option>
+                                        <option value="false">No</option>
+                                    </select>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={saveItem} disabled={savingItem} className="flex-1 bg-orange-600 text-white rounded px-3 py-2 text-sm">{savingItem ? "Saving…" : itemForm._id ? "Update" : "Add"}</button>
-                                    {itemForm._id && <button onClick={() => setItemForm({ title: "", description: "", price: 0, category: "" })} className="px-3 py-2 text-sm border rounded">Clear</button>}
+                                    {itemForm._id && <button onClick={() => { setItemForm({ name: "", description: "", price: 0, category: "", available: true, image: "" }); setItemImagePreview(undefined); }} className="px-3 py-2 text-sm border rounded">Clear</button>}
                                 </div>
                             </div>
                         </div>

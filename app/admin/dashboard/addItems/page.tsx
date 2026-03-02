@@ -35,7 +35,15 @@ export default function AdminPage() {
         </div>
 
         <div className={styles.formBox}>
-          <label className={styles.labelSmall}>Upload image</label>
+          <label className={styles.labelSmall}>Image URL</label>
+          <input
+            className={styles.input}
+            value={vm.imageUrl}
+            onChange={(e) => vm.setImageUrl(e.target.value)}
+            placeholder="https://example.com/paneer.jpg"
+          />
+
+          <div className={styles.muted} style={{ marginBottom: 12 }}>Or upload to preview; we will still send the URL string in the payload.</div>
           <div className={styles.uploadBox} onClick={() => document.getElementById("file-input")?.click()}>
             {vm.imageDataUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -67,10 +75,10 @@ export default function AdminPage() {
             <div style={{ flex: 1 }}>
               <label className={styles.labelSmall}>Product category</label>
               <select className={styles.select} value={vm.category} onChange={(e) => vm.setCategory(e.target.value)}>
-                <option>Breads</option>
-                <option>Rice</option>
-                <option>Curry</option>
-                <option>Drinks</option>
+                <option value="main">Main</option>
+                <option value="starter">Starter</option>
+                <option value="dessert">Dessert</option>
+                <option value="drink">Drink</option>
               </select>
             </div>
 
@@ -80,8 +88,16 @@ export default function AdminPage() {
                 className={styles.input}
                 value={String(vm.price)}
                 onChange={(e) => vm.setPrice(e.target.value)}
-                placeholder="25"
+                placeholder="199"
               />
+            </div>
+
+            <div style={{ width: 160 }}>
+              <label className={styles.labelSmall}>Availability</label>
+              <select className={styles.select} value={vm.available ? "true" : "false"} onChange={(e) => vm.setAvailable(e.target.value === "true")}>
+                <option value="true">Available</option>
+                <option value="false">Unavailable</option>
+              </select>
             </div>
           </div>
 
@@ -107,7 +123,10 @@ export default function AdminPage() {
                     <div style={{ color: "#6b6b6b" }}>${it.price}</div>
                   </div>
                   <div className={styles.muted} style={{ marginTop: 6 }}>{it.description}</div>
-                  <div style={{ marginTop: 8 }}><span className={styles.categoryTag}>{it.category}</span></div>
+                  <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className={styles.categoryTag}>{it.category}</span>
+                    <span className={styles.badge}>{it.available ? "Available" : "Unavailable"}</span>
+                  </div>
                 </div>
               </div>
             ))}

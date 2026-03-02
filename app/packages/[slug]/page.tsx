@@ -112,7 +112,11 @@ export default function PackagePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {items.map((it: any) => {
             const firstWord = (it.name || '').split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
-            const trySrc = `/assets/images/${firstWord}.jpg`;
+            const imageMap: Record<string, string> = {
+              paneer: '/assets/images/placeholder.svg',
+              mixed: '/assets/images/placeholder.svg',
+            };
+            const trySrc = imageMap[firstWord] || '/assets/images/placeholder.svg';
             const price = getPrice(it.id);
             const qty = quantities[it.id] || 0;
 

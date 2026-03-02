@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_BASE } from "../../../lib/api";
 import RectangleImg from "../../assets/images/Rectangle.png";
 import food1 from "../../assets/images/food1.png";
 import food2 from "../../assets/images/food2.png";
@@ -95,6 +96,84 @@ const Deals = () => (
 
 const DashboardPage = () => {
   const router = useRouter();
+  const [specialItems, setSpecialItems] = useState<Array<{ id: string; name: string; description?: string; price?: number; category?: string; image?: string; available?: boolean }>>([]);
+  const [specialLoading, setSpecialLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    const normalize = (list: any[]) => (list || []).map((it: any) => ({
+      id: it._id || it.id || it.name,
+      name: it.name || it.title || "Item",
+      description: it.description,
+      price: it.price,
+      category: it.category,
+      image: it.image,
+      available: it.available !== false,
+    }));
+
+    const load = async () => {
+      setSpecialLoading(true);
+      try {
+        const paths = [
+          `${API_BASE}/items`,
+          `${API_BASE}/menu`,
+          `/api/items`,
+          `/api/menu`,
+        ];
+        for (const url of paths) {
+          try {
+            const res = await fetch(url);
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) continue;
+            const list = Array.isArray(json?.data?.items)
+              ? json.data.items
+              : Array.isArray(json?.items)
+              ? json.items
+              : Array.isArray(json?.data)
+              ? json.data
+              : Array.isArray(json)
+              ? json
+              : [];
+            if (active) setSpecialItems(normalize(list));
+            return;
+          } catch (err) {
+            if ((err as any)?.name === 'AbortError') return;
+            continue;
+          }
+        }
+        if (active) setSpecialItems([]);
+      } catch (e) {
+        if (active) setSpecialItems([]);
+      } finally {
+        if (active) setSpecialLoading(false);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const quickBook = (it: { id: string; name: string; price?: number; available?: boolean }) => {
+    if (it.available === false) { alert('This item is currently unavailable.'); return; }
+    const price = Number(it.price || 99) || 99;
+    const draft = {
+      items: [{ id: it.id, name: it.name, qty: 1, price, subtotal: price }],
+      total: price,
+      day: 'Mon',
+      time: 'Lunch',
+      frequency: 'once',
+      draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      createdAt: new Date().toISOString(),
+      source: 'dashboard-special',
+    };
+    try {
+      sessionStorage.setItem('bookingDraft', JSON.stringify(draft));
+      router.push('/packages/confirm');
+    } catch (e) {
+      alert('Could not create booking draft');
+    }
+  };
 
   // Package selection: fixed items per package and day
   const packages = ["Veg", "Non-Veg", "Mixed", "Premium"];
@@ -197,6 +276,59 @@ const DashboardPage = () => {
           </div>
 
           <div className="mt-6 text-sm text-neutral-600">Click a package to view day-wise menu and select items by day and time.</div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Special Items</h3>
+            <div className="text-sm text-neutral-500">Curated by admin</div>
+          </div>
+          {specialLoading && <div className="text-neutral-600">Loading items…</div>}
+          {!specialLoading && specialItems.length === 0 && (
+            <div className="bg-white border border-dashed border-neutral-200 rounded-xl p-6 text-neutral-600">No special items available right now.</div>
+          )}
+          {!specialLoading && specialItems.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {specialItems.map((it) => (
+                <article key={it.id} className="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden hover:shadow-lg transition">
+                  <div className="h-44 bg-neutral-100 overflow-hidden relative">
+                    <img
+                      src={it.image || RectangleImg.src}
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = RectangleImg.src; }}
+                      alt={it.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-3 left-3 bg-white/85 backdrop-blur text-xs px-3 py-1 rounded-full border border-neutral-200">{it.category || 'Special'}</div>
+                  </div>
+                  <div className="p-4 flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm text-neutral-500">Special item</div>
+                        <h4 className="text-lg font-semibold text-neutral-900">{it.name}</h4>
+                        <p className="text-sm text-neutral-600 line-clamp-2">{it.description || 'Freshly prepared by our kitchen.'}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xl font-bold text-orange-600">₹{(Number(it.price||0)).toFixed(2)}</div>
+                        <div className={`text-[11px] font-semibold mt-1 px-2 py-1 rounded-full border ${it.available === false ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                          {it.available === false ? 'Unavailable' : 'Available'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Link href={`/menu/${it.id}`} className="px-3 py-2 border border-neutral-200 rounded-md text-sm text-neutral-800 hover:bg-neutral-50">View</Link>
+                      <button
+                        onClick={() => quickBook(it)}
+                        disabled={it.available === false}
+                        className={`px-3 py-2 rounded-md text-sm shadow-sm transition ${it.available === false ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed' : 'bg-orange-600 text-white hover:-translate-y-0.5'}`}
+                      >
+                        Book
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

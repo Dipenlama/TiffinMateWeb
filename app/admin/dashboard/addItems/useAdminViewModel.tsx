@@ -8,19 +8,29 @@ export type Product = {
   description: string;
   category: string;
   price: number;
-  image?: string; // data URL
+  image?: string; // url or data URL
+  available: boolean;
 };
 
 export function useAdminViewModel() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("Breads");
+  const [category, setCategory] = useState("main");
   const [price, setPrice] = useState<string | number>("");
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [available, setAvailable] = useState<boolean>(true);
   const [imageDataUrl, setImageDataUrl] = useState<string | undefined>(undefined);
   const [items, setItems] = useState<Product[]>(() => {
     try {
       const raw = localStorage.getItem("admin_items");
-      return raw ? (JSON.parse(raw) as Product[]) : [];
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as Product[];
+      return Array.isArray(parsed)
+        ? parsed.map((p) => ({
+            ...p,
+            available: p?.available !== false, // default to true for legacy entries
+          }))
+        : [];
     } catch {
       return [];
     }
@@ -36,8 +46,10 @@ export function useAdminViewModel() {
   const resetForm = () => {
     setName("");
     setDescription("");
-    setCategory("Breads");
+    setCategory("main");
     setPrice("");
+    setImageUrl("");
+    setAvailable(true);
     setImageDataUrl(undefined);
   };
 
@@ -48,7 +60,8 @@ export function useAdminViewModel() {
       description: description.trim(),
       category,
       price: Number(price) || 0,
-      image: imageDataUrl,
+      image: (imageUrl || imageDataUrl || "").trim() || undefined,
+      available,
     };
     const next = [item, ...items];
     setItems(next);
@@ -69,6 +82,10 @@ export function useAdminViewModel() {
     setCategory,
     price,
     setPrice,
+    imageUrl,
+    setImageUrl,
+    available,
+    setAvailable,
     imageDataUrl,
     handleImageChange,
     items,
