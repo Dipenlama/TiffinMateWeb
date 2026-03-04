@@ -12,11 +12,12 @@ export default function MenuItemPage() {
   const [error, setError] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [adding, setAdding] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<string>("Mon");
+  const [selectedDays, setSelectedDays] = useState<string[]>(["Mon"]);
   const [selectedTime, setSelectedTime] = useState<string>("Lunch");
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const times = ["Breakfast", "Lunch", "Dinner"];
+  const dayLabel = selectedDays.length ? selectedDays.join(', ') : 'Select days';
 
   useEffect(() => {
     let mounted = true;
@@ -57,7 +58,7 @@ export default function MenuItemPage() {
   };
 
   const bookForDay = () => {
-    // open modal-based booking confirmation instead (handled below)
+    if (!selectedDays.length) return alert('Please pick at least one day.');
     setShowBooking(true);
   };
 
@@ -71,7 +72,8 @@ export default function MenuItemPage() {
     const booking = {
       items: [itm],
       total: itm.subtotal,
-      day: selectedDay,
+      day: selectedDays[0],
+      days: selectedDays,
       time: selectedTime,
       frequency,
       draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
@@ -106,15 +108,18 @@ export default function MenuItemPage() {
             <div className="mt-4 text-lg font-bold text-neutral-900">₹{Number(item.price || 99).toFixed(2)}</div>
 
             <div className="mt-6">
-              <div className="flex gap-3">
-                {days.map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setSelectedDay(d)}
-                    className={`px-3 py-1 rounded text-sm font-medium ${selectedDay===d ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50'}`}>
-                    {d}
-                  </button>
-                ))}
+              <div className="flex gap-3 flex-wrap">
+                {days.map(d => {
+                  const active = selectedDays.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      onClick={() => setSelectedDays((prev) => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])}
+                      className={`px-3 py-1 rounded text-sm font-medium ${active ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-50'}`}>
+                      {d}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex gap-3 mt-4">
@@ -139,7 +144,7 @@ export default function MenuItemPage() {
 
               <div className="mt-6 flex gap-3">
                 <button onClick={addToCart} disabled={adding} className="px-4 py-2 bg-white border rounded text-neutral-800">{adding ? 'Adding…' : 'Add to cart'}</button>
-                <button onClick={bookForDay} className="px-4 py-2 bg-orange-600 text-white rounded">Book for {selectedDay}</button>
+                <button onClick={bookForDay} className="px-4 py-2 bg-orange-600 text-white rounded">Book for {dayLabel}</button>
               </div>
             </div>
           </div>
@@ -154,8 +159,8 @@ export default function MenuItemPage() {
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div>
-                <div className="text-xs text-neutral-500">Day</div>
-                <div className="font-medium">{selectedDay}</div>
+                <div className="text-xs text-neutral-500">Day(s)</div>
+                <div className="font-medium">{dayLabel}</div>
               </div>
               <div>
                 <div className="text-xs text-neutral-500">Time</div>

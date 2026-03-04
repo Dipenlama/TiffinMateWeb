@@ -2,18 +2,21 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { packageMenu } from "../data";
+import { packageMenu, vegFixedPackages } from "../data";
 
 export default function ConfirmPage() {
   const router = useRouter();
   const [booking, setBooking] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
+  const [address, setAddress] = useState('');
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('bookingDraft');
       if (!raw) return;
-      setBooking(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      setBooking(parsed);
+      setAddress(parsed.address || parsed.meta?.address || '');
     } catch (e) {
       console.error(e);
     }
@@ -34,6 +37,7 @@ export default function ConfirmPage() {
   }
 
   const total = booking.total || booking.items?.reduce((s: number, it: any) => s + (it.subtotal || 0), 0);
+  const dayLabel = Array.isArray(booking?.days) ? booking.days.join(', ') : booking?.day;
 
   const cancel = () => {
     sessionStorage.removeItem('bookingDraft');
@@ -57,13 +61,18 @@ export default function ConfirmPage() {
         const pickedPackage = allowedPackages.includes(draft.package) ? draft.package : allowedPackages.includes(draft.packageName) ? draft.packageName : 'Veg';
         const packageName = draft.packageName || draft.package || `${pickedPackage} Plan`;
 
+        const daysArray = Array.isArray(draft.days) ? draft.days : draft.day ? [draft.day] : ['Mon'];
+        const primaryDay = daysArray[0] || 'Mon';
+
         const payload = {
           ...draft,
           package: pickedPackage,
           packageName,
           frequency: draft.frequency || 'once',
-          day: draft.day || 'Mon',
+          day: primaryDay,
+          days: daysArray,
           time: draft.time || 'Lunch',
+          address: address || draft.address || undefined,
           items: (draft.items || []).map((it: any) => ({
             id: it.id,
             name: it.name,
@@ -73,6 +82,9 @@ export default function ConfirmPage() {
           })),
           total: draft.total || draft.items?.reduce((s:number,it:any)=>s+(Number(it.subtotal)||0),0) || 0,
         };
+
+        const draftWithAddress = { ...draft, address: payload.address };
+        try { sessionStorage.setItem('bookingDraft', JSON.stringify(draftWithAddress)); } catch (e) {}
 
         const createRes: any = await api.createBooking(payload, draft.draftId || undefined);
         console.log('createBooking response', createRes);
@@ -148,7 +160,17 @@ export default function ConfirmPage() {
       <main className="max-w-7xl mx-auto px-6 py-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="mb-4 text-sm text-neutral-600">Package: <span className="font-medium">{booking.packageName || booking.package}</span></div>
-          <div className="mb-4 text-sm text-neutral-600">Day: <span className="font-medium">{booking.day}</span> • Time: <span className="font-medium">{booking.time}</span> • Frequency: <span className="font-medium">{booking.frequency || 'once'}</span></div>
+          <div className="mb-4 text-sm text-neutral-600">Day(s): <span className="font-medium">{dayLabel}</span> • Time: <span className="font-medium">{booking.time}</span> • Frequency: <span className="font-medium">{booking.frequency || 'once'}</span></div>
+          <div className="mb-6">
+            <label className="text-xs text-neutral-500 uppercase tracking-wide">Delivery address</label>
+            <textarea
+              className="mt-2 w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Apartment, street, city"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+          </div>
 
           <div className="grid grid-cols-1 gap-3">
             {booking.items?.map((it: any) => {
@@ -162,6 +184,16 @@ export default function ConfirmPage() {
                     if (found) { displayName = found.name; break; }
                   }
                   if (displayName !== it.name) break;
+                }
+                if (displayName === it.name) {
+                  for (const vegPkg of vegFixedPackages) {
+                    const daysObj = vegPkg.days as Record<string, any>;
+                    for (const d of Object.keys(daysObj)) {
+                      const found = daysObj[d].find((x: any) => x.id === it.id);
+                      if (found) { displayName = found.name; break; }
+                    }
+                    if (displayName !== it.name) break;
+                  }
                 }
               }
 

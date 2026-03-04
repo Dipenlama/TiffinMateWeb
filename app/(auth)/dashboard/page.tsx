@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { API_BASE } from "../../../lib/api";
 import RectangleImg from "../../assets/images/Rectangle.png";
 import food1 from "../../assets/images/food1.png";
@@ -15,22 +14,20 @@ import food7 from "../../assets/images/food7.png";
 import thukpa from "../../assets/images/thukpa.png";
 
 const Hero = () => (
-  <section className="max-w-7xl mx-auto px-6 py-10">
-    <div className="bg-white rounded-2xl overflow-hidden shadow-lg grid md:grid-cols-2 gap-6 items-center p-6">
-      <div className="p-6">
-        <p className="text-sm text-neutral-500 mb-2">Order food on a tiffin basis.</p>
-        <h1 className="text-4xl md:text-5xl font-extrabold text-neutral-900 leading-tight">Feast Your Senses, <span className="text-orange-600">With Tiffin Mate</span></h1>
-        <p className="mt-4 text-sm text-neutral-600">See what we serve on daily basis</p>
-
-        <div className="mt-6 flex gap-3">
-          <input className="flex-1 border border-neutral-200 rounded-full px-4 py-3" placeholder="Menu" />
-          <button className="px-6 py-3 rounded-full bg-orange-600 text-white font-medium">Search</button>
+  <section className="max-w-7xl mx-auto px-6 pt-10 pb-8">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-xl grid md:grid-cols-2 gap-6 items-center p-8">
+      <div className="relative z-10 space-y-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 border border-white/20 text-xs uppercase tracking-wide">Daily tiffin</div>
+        <h1 className="text-4xl md:text-5xl font-extrabold leading-tight drop-shadow-sm">Home-style meals, on time.</h1>
+        <p className="text-base md:text-lg text-white/90 max-w-xl">Pick a package or book a special—freshly cooked food delivered in neat time slots.</p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link href="/packages" className="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white text-orange-600 font-semibold shadow-sm hover:-translate-y-0.5 transition">Browse packages</Link>
+          <Link href="/menu" className="inline-flex items-center justify-center px-5 py-3 rounded-full bg-white/10 border border-white/30 text-white font-semibold hover:bg-white/15 transition">See today’s menu</Link>
         </div>
       </div>
-
       <div className="relative flex items-center justify-center">
-        <div className="absolute right-0 top-0 -translate-y-8 w-72 h-72 md:w-96 md:h-96 rounded-l-full bg-orange-600/95"></div>
-        <div className="relative z-10 w-64 h-64 md:w-80 md:h-80 rounded-2xl overflow-hidden shadow-xl">
+        <div className="absolute inset-0 bg-white/10 blur-3xl" aria-hidden />
+        <div className="relative z-10 w-64 h-64 md:w-80 md:h-80 rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/10">
           <img src={RectangleImg.src} alt="hero" className="w-full h-full object-cover" />
         </div>
       </div>
@@ -50,54 +47,16 @@ const Card = ({ title, subtitle, img, badge }: { title: string; subtitle?: strin
   </div>
 );
 
-const Categories = () => (
-  <div className="max-w-7xl mx-auto px-6 py-8">
-    <h3 className="text-lg font-semibold mb-4">Order Popular Categories</h3>
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-      {[
-        { name: "Burgers & Fast food", img: food1.src },
-        { name: "Salads", img: food2.src },
-        { name: "Pasta & Casuals", img: food3.src },
-        { name: "Pizza", img: food4.src },
-        { name: "Breakfast", img: food5.src },
-        { name: "Soups", img: food6.src },
-      ].map((c) => (
-        <div key={c.name} className="bg-white rounded-lg p-3 flex flex-col items-center gap-2 text-center shadow-sm">
-          <div className="w-20 h-20 rounded-lg overflow-hidden">
-            <img src={c.img} className="w-full h-full object-cover" />
-          </div>
-          <div className="text-sm font-medium">{c.name}</div>
-          <div className="text-xs text-neutral-500">32 Restaurants</div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+const Categories = () => null;
 
-const Deals = () => (
-  <section className="max-w-7xl mx-auto px-6 py-6">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold">Up to -40% 🎉 Order exclusive deals</h3>
-      <div className="flex gap-3 text-sm text-neutral-600">
-        <button className="px-3 py-1 rounded-full border">Vegan</button>
-        <button className="px-3 py-1 rounded-full border">Sushi</button>
-        <button className="px-3 py-1 rounded-full bg-orange-600 text-white">Pizza & Fast food</button>
-        <button className="px-3 py-1 rounded-full border">others</button>
-      </div>
-    </div>
+const Deals = () => null;
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-      <Card title="Chef Burgers London" img={food7.src} badge="-40%" />
-      <Card title="Grand Ai Cafe London" img={food4.src} badge="-20%" />
-      <Card title="Butterbrot Caf'e London" img={thukpa.src} badge="-17%" />
-    </div>
-  </section>
-);
+const assetHost = API_BASE.replace(/\/api$/, "");
 
 const DashboardPage = () => {
-  const router = useRouter();
   const [specialItems, setSpecialItems] = useState<Array<{ id: string; name: string; description?: string; price?: number; category?: string; image?: string; available?: boolean }>>([]);
   const [specialLoading, setSpecialLoading] = useState<boolean>(false);
+  const [specialFilter, setSpecialFilter] = useState<string>('all');
 
   useEffect(() => {
     let active = true;
@@ -154,27 +113,6 @@ const DashboardPage = () => {
     };
   }, []);
 
-  const quickBook = (it: { id: string; name: string; price?: number; available?: boolean }) => {
-    if (it.available === false) { alert('This item is currently unavailable.'); return; }
-    const price = Number(it.price || 99) || 99;
-    const draft = {
-      items: [{ id: it.id, name: it.name, qty: 1, price, subtotal: price }],
-      total: price,
-      day: 'Mon',
-      time: 'Lunch',
-      frequency: 'once',
-      draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      createdAt: new Date().toISOString(),
-      source: 'dashboard-special',
-    };
-    try {
-      sessionStorage.setItem('bookingDraft', JSON.stringify(draft));
-      router.push('/packages/confirm');
-    } catch (e) {
-      alert('Could not create booking draft');
-    }
-  };
-
   // Package selection: fixed items per package and day
   const packages = ["Veg", "Non-Veg", "Mixed", "Premium"];
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -226,9 +164,15 @@ const DashboardPage = () => {
     setSelectedItems((s) => ({ ...s, [id]: !s[id] }));
   };
 
+  const filteredSpecials = specialItems.filter((it) => {
+    if (specialFilter === 'all') return true;
+    const cat = (it.category || '').toLowerCase();
+    return cat === specialFilter;
+  }).slice(0, 6);
+
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 font-sans">
-      <main>
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white text-neutral-900 font-sans">
+      <main className="space-y-6">
         <Hero />
         <Deals />
         <Categories />
@@ -244,30 +188,30 @@ const DashboardPage = () => {
               { key: 'Premium', title: 'Premium', img: thukpa.src, price: '₹199', features: ['Chef curated', 'Gourmet sides'] },
             ].map((p) => (
               <Link key={p.key} href={`/packages/${p.key.toLowerCase().replace(/\s+/g, '-')}`} className="block">
-                <div className="relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all h-full">
+                <div className="relative rounded-2xl overflow-hidden bg-white border border-neutral-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all h-full">
                   <div className="absolute inset-0">
-                    <img src={p.img} alt={p.title} className="w-full h-full object-cover brightness-75" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+                    <img src={p.img} alt={p.title} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent"></div>
                   </div>
 
-                  <div className="relative p-5 flex flex-col h-full">
+                  <div className="relative p-5 flex flex-col h-full text-white">
                     <div className="flex items-center justify-between">
-                      <div className="text-xs text-white/90">{p.title} Package</div>
-                      <div className="bg-white/20 text-white px-2 py-1 rounded text-xs">Popular</div>
+                      <div className="text-xs text-white/80">{p.title} Package</div>
+                      <div className="bg-white/15 text-white px-2 py-1 rounded text-xs">Popular</div>
                     </div>
 
                     <div className="mt-4 flex-1">
-                      <div className="text-white font-bold text-xl">{p.title}</div>
+                      <div className="text-xl font-bold">{p.title}</div>
                       <div className="text-sm text-white/90 mt-2">{p.features.join(' • ')}</div>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between">
-                      <div className="text-white/90">From</div>
-                      <div className="text-white font-semibold text-lg">{p.price} / day</div>
+                      <div className="text-white/80">From</div>
+                      <div className="text-lg font-semibold">{p.price} / day</div>
                     </div>
 
                     <div className="mt-4">
-                      <button className="w-full bg-orange-600 hover:bg-orange-700 text-white rounded-full px-4 py-2 font-medium">View package</button>
+                      <button className="w-full bg-white text-orange-600 hover:bg-orange-50 rounded-full px-4 py-2 font-semibold shadow-sm">View package</button>
                     </div>
                   </div>
                 </div>
@@ -279,54 +223,72 @@ const DashboardPage = () => {
         </section>
 
         <section className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Special Items</h3>
-            <div className="text-sm text-neutral-500">Curated by admin</div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold">Special Items</h3>
+              <Link href="/menu" className="text-sm px-3 py-1.5 rounded-full bg-orange-600 text-white shadow-sm hover:-translate-y-0.5 transition">View all</Link>
+            </div>
+            <div className="flex flex-wrap gap-2 text-sm">
+              {[{ key: 'all', label: 'All' }, { key: 'veg', label: 'Veg' }, { key: 'non-veg', label: 'Non-Veg' }, { key: 'mixed', label: 'Mixed' }, { key: 'premium', label: 'Premium' }].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setSpecialFilter(f.key)}
+                  className={`px-3 py-1 rounded-full border transition ${specialFilter === f.key ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-neutral-700 border-neutral-200 hover:border-orange-300'}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
           {specialLoading && <div className="text-neutral-600">Loading items…</div>}
-          {!specialLoading && specialItems.length === 0 && (
+          {!specialLoading && filteredSpecials.length === 0 && (
             <div className="bg-white border border-dashed border-neutral-200 rounded-xl p-6 text-neutral-600">No special items available right now.</div>
           )}
-          {!specialLoading && specialItems.length > 0 && (
+          {!specialLoading && filteredSpecials.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {specialItems.map((it) => (
-                <article key={it.id} className="bg-white rounded-xl shadow-sm border border-neutral-100 overflow-hidden hover:shadow-lg transition">
-                  <div className="h-44 bg-neutral-100 overflow-hidden relative">
-                    <img
-                      src={it.image || RectangleImg.src}
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = RectangleImg.src; }}
-                      alt={it.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-3 left-3 bg-white/85 backdrop-blur text-xs px-3 py-1 rounded-full border border-neutral-200">{it.category || 'Special'}</div>
-                  </div>
-                  <div className="p-4 flex flex-col gap-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm text-neutral-500">Special item</div>
-                        <h4 className="text-lg font-semibold text-neutral-900">{it.name}</h4>
-                        <p className="text-sm text-neutral-600 line-clamp-2">{it.description || 'Freshly prepared by our kitchen.'}</p>
+              {filteredSpecials.map((it) => {
+                const unavailable = it.available === false;
+                const price = Number(it.price || 0);
+                return (
+                  <article key={it.id} className={`bg-white rounded-xl shadow-sm border overflow-hidden transition ${unavailable ? 'opacity-90' : 'hover:shadow-lg'}`}>
+                    <div className="h-44 bg-neutral-100 overflow-hidden relative">
+                      <img
+                        src={it.image ? (it.image.startsWith('http') ? it.image : `${assetHost}/${it.image.replace(/^\/+/, '')}`) : RectangleImg.src}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = RectangleImg.src; }}
+                        alt={it.name}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-3 left-3 bg-white/85 backdrop-blur text-xs px-3 py-1 rounded-full border border-neutral-200">{it.category || 'Special'}</div>
+                      <div className={`absolute top-3 right-3 text-xs px-2 py-1 rounded-full border ${unavailable ? 'bg-red-50 text-red-700 border-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+                        {unavailable ? 'Not bookable' : 'Bookable now'}
                       </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-orange-600">₹{(Number(it.price||0)).toFixed(2)}</div>
-                        <div className={`text-[11px] font-semibold mt-1 px-2 py-1 rounded-full border ${it.available === false ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
-                          {it.available === false ? 'Unavailable' : 'Available'}
+                    </div>
+
+                    <div className="p-4 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <div className="text-xs text-neutral-500">Special item</div>
+                          <h4 className="text-lg font-semibold text-neutral-900 leading-snug">{it.name}</h4>
+                          <p className="text-sm text-neutral-600 line-clamp-2">{it.description || 'Freshly prepared by our kitchen.'}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-orange-600">{price > 0 ? `₹${price.toFixed(2)}` : '₹—'}</div>
+                          <div className={`text-[11px] font-semibold mt-1 px-2 py-1 rounded-full border ${unavailable ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                            {unavailable ? 'Unavailable' : 'Available'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[11px] text-neutral-500">ID: {it.id}</div>
+                        <div className="flex gap-2">
+                          <Link href={`/menu/${it.id}`} className="px-3 py-2 border border-neutral-200 rounded-md text-sm text-neutral-800 hover:bg-neutral-50">View</Link>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <Link href={`/menu/${it.id}`} className="px-3 py-2 border border-neutral-200 rounded-md text-sm text-neutral-800 hover:bg-neutral-50">View</Link>
-                      <button
-                        onClick={() => quickBook(it)}
-                        disabled={it.available === false}
-                        className={`px-3 py-2 rounded-md text-sm shadow-sm transition ${it.available === false ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed' : 'bg-orange-600 text-white hover:-translate-y-0.5'}`}
-                      >
-                        Book
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

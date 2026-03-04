@@ -10,6 +10,7 @@ type Booking = {
   packageName?: string;
   day?: string;
   time?: string;
+  address?: string;
   items?: Array<{ id?: string; name?: string; qty?: number; price?: number; subtotal?: number }>;
   total?: number;
   status?: string;
@@ -164,6 +165,7 @@ export default function BookingsPage() {
                 <tr>
                   <th className="text-left px-4 py-3">Package</th>
                   <th className="text-left px-4 py-3">Day / Time</th>
+                  <th className="text-left px-4 py-3">Address</th>
                   <th className="text-left px-4 py-3">Total</th>
                   <th className="text-left px-4 py-3">Status</th>
                   <th className="text-left px-4 py-3">Created</th>
@@ -175,6 +177,7 @@ export default function BookingsPage() {
                   <tr key={bk._id} className="border-t border-neutral-100">
                     <td className="px-4 py-3 font-medium text-neutral-900">{bk.packageName || bk.package || '—'}</td>
                     <td className="px-4 py-3 text-neutral-700">{bk.day || '—'} {bk.time ? `• ${bk.time}` : ''}</td>
+                    <td className="px-4 py-3 text-neutral-700 max-w-xs whitespace-pre-wrap">{bk.address || (bk as any)?.meta?.address || '—'}</td>
                     <td className="px-4 py-3 text-neutral-900">₹{Number(bk.total || 0).toFixed(2)}</td>
                     <td className="px-4 py-3"><span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700">{bk.status || 'pending'}</span></td>
                     <td className="px-4 py-3 text-neutral-600">{bk.createdAt ? new Date(bk.createdAt).toLocaleString() : '—'}</td>

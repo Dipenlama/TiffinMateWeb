@@ -55,7 +55,13 @@ export async function fetchUserById(token: string, id: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, data: json };
+  const scrubbed = (() => {
+    const clone = typeof json === 'object' && json !== null ? { ...json } : json;
+    if (clone?.data?.password) delete clone.data.password;
+    if (clone?.password) delete clone.password;
+    return clone;
+  })();
+  return { ok: res.ok, status: res.status, data: scrubbed };
 }
 
 export async function updateUserById(token: string, id: string, data: any) {
@@ -171,11 +177,35 @@ export async function fetchProfile() {
     const token = localStorage.getItem('token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}/auth/me`, {
-    credentials: 'include',
-    headers,
-  });
-  return handleResp(res);
+  const getFrom = async (url: string) => {
+    const res = await fetch(url, { credentials: 'include', headers });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data: json } as const;
+  };
+
+  const attempts = [
+    `${API_BASE}/auth/me`,
+    `${API_BASE}/profile`,
+    `${API_BASE}/me`,
+    `${API_BASE}/users/me`,
+  ];
+
+  let lastErr: string | null = null;
+  for (const url of attempts) {
+    try {
+      const res = await getFrom(url);
+      if (res.status === 404) continue;
+      if (!res.ok) {
+        lastErr = res.data?.message || res.data?.error || 'Failed to fetch profile';
+        continue;
+      }
+      return res.data?.data || res.data?.user || res.data || {};
+    } catch (e: any) {
+      lastErr = e?.message || 'Failed to fetch profile';
+    }
+  }
+
+  throw new Error(lastErr || 'Failed to fetch profile');
 }
 
 export async function updateProfile(data: any) {
@@ -197,6 +227,8 @@ export async function updateProfile(data: any) {
   };
 
   const attempts = [
+    `/api/users/me`, // explicit frontend route for current user update
+    `${API_BASE}/users/me`,
     `${API_BASE}/profile`,
     `${API_BASE}/auth/me`,
   ];
@@ -254,21 +286,83 @@ export async function fetchAddresses() {
     const token = localStorage.getItem('token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
-  const res = await fetch(`${API_BASE}/profile/addresses`, {
-    credentials: 'include',
-    headers,
-  });
-  return handleResp(res);
+  const getFrom = async (url: string) => {
+    const res = await fetch(url, { credentials: 'include', headers });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data: json } as const;
+  };
+
+  const attempts = [
+    `${API_BASE}/profile/addresses`,
+    `${API_BASE}/addresses`,
+    `${API_BASE}/profile/address`,
+    `${API_BASE}/auth/addresses`,
+    `${API_BASE}/users/addresses`,
+  ];
+
+  let lastErr: string | null = null;
+  for (const url of attempts) {
+    try {
+      const res = await getFrom(url);
+      if (res.status === 404) continue; // try next shape
+      if (!res.ok) {
+        lastErr = res.data?.message || res.data?.error || 'Failed to fetch addresses';
+        continue;
+      }
+      return res.data?.data || res.data?.addresses || res.data || [];
+    } catch (e: any) {
+      lastErr = e?.message || 'Failed to fetch addresses';
+      continue;
+    }
+  }
+
+  if (lastErr) throw new Error(lastErr);
+  return []; // all 404s
 }
 
 export async function addAddress(addr: string) {
-  const res = await fetch(`${API_BASE}/profile/addresses`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ address: addr }),
-  });
-  return handleResp(res);
+  const headers: any = { 'Content-Type': 'application/json' };
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const postTo = async (url: string) => {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ address: addr }),
+    });
+    const json = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data: json } as const;
+  };
+
+  const attempts = [
+    `${API_BASE}/profile/addresses`,
+    `${API_BASE}/addresses`,
+    `${API_BASE}/profile/address`,
+    `${API_BASE}/auth/addresses`,
+    `${API_BASE}/users/addresses`,
+  ];
+
+  let lastErr: string | null = null;
+  for (const url of attempts) {
+    try {
+      const res = await postTo(url);
+      if (res.status === 404) continue;
+      if (!res.ok) {
+        lastErr = res.data?.message || res.data?.error || 'Failed to add address';
+        continue;
+      }
+      return res.data;
+    } catch (e: any) {
+      lastErr = e?.message || 'Failed to add address';
+      continue;
+    }
+  }
+
+  throw new Error(lastErr || 'Failed to add address');
 }
 
 export async function fetchAdminOrders() {

@@ -45,6 +45,8 @@ type MenuItem = {
 };
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5050/api").replace(/\/$/, "");
+const API_HOST = API_BASE.replace(/\/api$/, "");
+const MAX_IMAGE_BYTES = 700 * 1024; // keep below backend 1MB once base64 encoded
 
 function getToken(): string | null {
     if (typeof window === "undefined") return null;
@@ -92,13 +94,22 @@ export default function AdminDashboardPage() {
     const [itemsLoading, setItemsLoading] = useState(false);
     const [itemsError, setItemsError] = useState<string | null>(null);
 
-    const [itemForm, setItemForm] = useState<MenuItem>({ name: "", description: "", price: 0, category: "", available: true, image: "" });
+    const [itemForm, setItemForm] = useState<MenuItem>({ name: "", description: "", price: 0, category: "veg", available: true, image: "" });
     const [itemImagePreview, setItemImagePreview] = useState<string | undefined>(undefined);
+    const [itemImageFile, setItemImageFile] = useState<File | undefined>(undefined);
     const [savingItem, setSavingItem] = useState(false);
 
     const [userForm, setUserForm] = useState<NewUser>({ username: "", email: "", password: "", confirmPassword: "", role: "user" });
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [savingUser, setSavingUser] = useState(false);
+
+    const normalizeBookingStatus = (b: Booking) => {
+        const raw = (b.status || (b as any).bookingStatus || (b as any).orderStatus || "pending").toString().toLowerCase();
+        const allowed = ["pending", "accepted", "dispatched", "delivered", "cancelled"];
+        return allowed.includes(raw) ? raw : "pending";
+    };
+
+    const formatINR = (value: number) => `₹${Math.round(value).toLocaleString("en-IN")}`;
 
     useEffect(() => {
         setToken(getToken());
@@ -157,9 +168,35 @@ export default function AdminDashboardPage() {
         if (!token) return;
         setBookingsLoading(true);
         setBookingsError(null);
-        const res = await apiGet("/admin/bookings?page=1&limit=50", token);
-        if (!res.ok) setBookingsError(`Failed to load bookings (${res.status})`);
-        setBookings(Array.isArray(res.data?.items) ? res.data.items : Array.isArray(res.data) ? res.data : []);
+
+        const tryPaths = [
+            "/admin/bookings?page=1&limit=50",
+            "/bookings?page=1&limit=50",
+        ];
+
+        let loaded: Booking[] = [];
+        let lastError: string | null = null;
+
+        for (const path of tryPaths) {
+            const res = await apiGet(path, token);
+            if (!res.ok) {
+                lastError = `Failed to load bookings (${res.status})`;
+                continue;
+            }
+            const list = Array.isArray(res.data?.items)
+                ? res.data.items
+                : Array.isArray(res.data?.bookings)
+                ? res.data.bookings
+                : Array.isArray(res.data)
+                ? res.data
+                : [];
+            loaded = list as Booking[];
+            lastError = null;
+            break;
+        }
+
+        if (lastError) setBookingsError(lastError);
+        setBookings(loaded);
         setBookingsLoading(false);
     };
 
@@ -193,26 +230,65 @@ export default function AdminDashboardPage() {
         setItemsLoading(false);
     };
 
+    const resolveImageSrc = (img?: string) => {
+        if (!img) return "";
+        if (img.startsWith("http") || img.startsWith("data:")) return img;
+        return `${API_HOST}/${img.replace(/^\/+/, "")}`;
+    };
+
     const saveItem = async () => {
         if (!token) return;
+        const name = itemForm.name?.trim() || "";
+        const price = Number(itemForm.price) || 0;
+        const description = itemForm.description?.trim() || "";
+        if (!name) { alert('Name is required'); return; }
+        if (price <= 0) { alert('Price must be greater than 0'); return; }
+
+        const imageValue = (itemForm.image || "").trim();
+        if (imageValue.startsWith('data:')) {
+            alert('Data URI images are not allowed. Please upload a file instead.');
+            return;
+        }
+
         setSavingItem(true);
-        const payload = {
-            name: itemForm.name?.trim() || "",
-            description: itemForm.description?.trim() || "",
-            image: (itemForm.image || itemImagePreview || "").trim() || undefined,
-            price: Number(itemForm.price) || 0,
-            category: itemForm.category || "General",
-            available: itemForm.available !== false,
-        };
         const path = itemForm._id ? `/admin/items/${itemForm._id}` : "/admin/items";
         const method = itemForm._id ? "PUT" : "POST";
-        const res = await apiSend(path, token, method, payload);
+
+        let res: any;
+        if (itemImageFile) {
+            const form = new FormData();
+            form.append('name', name);
+            form.append('description', description);
+            form.append('price', String(price));
+            form.append('category', itemForm.category || "veg");
+            form.append('available', itemForm.available !== false ? 'true' : 'false');
+            form.append('image', itemImageFile);
+            res = await fetch(`${API_BASE}${path}`, {
+                method,
+                headers: { Authorization: `Bearer ${token}` },
+                body: form,
+            }).then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }));
+        } else {
+            const payload = {
+                name,
+                description,
+                image: imageValue || undefined,
+                price,
+                category: itemForm.category || "veg",
+                available: itemForm.available !== false,
+            };
+            res = await apiSend(path, token, method, payload);
+        }
+
         if (!res.ok) {
-            alert("Failed to save item");
+            const message = (res.data as any)?.message || (res.data as any)?.error || `Failed to save item (${res.status})`;
+            console.error("Save item failed", { status: res.status, data: res.data });
+            alert(message);
         } else {
             loadItems();
-            setItemForm({ name: "", description: "", price: 0, category: "", available: true, image: "" });
+            setItemForm({ name: "", description: "", price: 0, category: "veg", available: true, image: "" });
             setItemImagePreview(undefined);
+            setItemImageFile(undefined);
         }
         setSavingItem(false);
     };
@@ -228,6 +304,7 @@ export default function AdminDashboardPage() {
             available: itm.available !== false,
         } as any);
         setItemImagePreview(itm.image);
+        setItemImageFile(undefined);
         setTab("items");
     };
 
@@ -246,31 +323,202 @@ export default function AdminDashboardPage() {
         items: items.length,
     }), [users, bookings, items]);
 
+    const bookingInsights = useMemo(() => {
+        const counts: Record<string, number> = { pending: 0, accepted: 0, dispatched: 0, delivered: 0, cancelled: 0 };
+        let revenue = 0;
+
+        bookings.forEach((b) => {
+            const status = normalizeBookingStatus(b);
+            counts[status] = (counts[status] || 0) + 1;
+            revenue += Number(b.total || 0);
+        });
+
+        const recent = [...bookings]
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+            .slice(0, 5);
+
+        const cancellationRate = bookings.length ? Math.round((counts.cancelled / bookings.length) * 100) : 0;
+        const active = bookings.length - counts.cancelled;
+
+        return { counts, revenue, recent, cancellationRate, active };
+    }, [bookings]);
+
+    const bookingTrend = useMemo(() => {
+        const today = new Date();
+        const days = Array.from({ length: 10 }, (_, i) => {
+            const d = new Date(today);
+            d.setDate(today.getDate() - (9 - i));
+            const key = d.toISOString().slice(0, 10);
+            const label = d.toLocaleDateString("en-IN", { month: "short", day: "numeric" });
+            const value = bookings.filter((b) => (b.createdAt ? b.createdAt.slice(0, 10) : "") === key).length;
+            return { key, label, value };
+        });
+
+        const max = Math.max(...days.map((d) => d.value), 0);
+        const points = days.map((d, idx) => {
+            const x = days.length > 1 ? (idx / (days.length - 1)) * 100 : 0;
+            const y = max > 0 ? 100 - (d.value / max) * 100 : 100;
+            return { ...d, x, y };
+        });
+
+        return { days, points, max };
+    }, [bookings]);
+
     const orangeCard = "bg-gradient-to-r from-orange-500 to-amber-500 text-white";
 
     return (
-        <div className="min-h-screen bg-neutral-50 text-neutral-900">
+        <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white text-neutral-900">
             <main className="max-w-7xl mx-auto px-6 py-8">
-                <header className="mb-8">
-                    <p className="text-sm text-neutral-500">Admin</p>
-                    <h1 className="text-3xl font-bold">Dashboard</h1>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                        <button onClick={() => setTab("overview")} className={`px-3 py-2 rounded-full text-sm font-semibold ${tab === "overview" ? orangeCard : "bg-white border border-neutral-200 text-neutral-800"}`}>Overview</button>
-                        <button onClick={() => setTab("users")} className={`px-3 py-2 rounded-full text-sm font-semibold ${tab === "users" ? orangeCard : "bg-white border border-neutral-200 text-neutral-800"}`}>Users</button>
-                        <button onClick={() => setTab("bookings")} className={`px-3 py-2 rounded-full text-sm font-semibold ${tab === "bookings" ? orangeCard : "bg-white border border-neutral-200 text-neutral-800"}`}>Bookings</button>
-                        <button onClick={() => setTab("items")} className={`px-3 py-2 rounded-full text-sm font-semibold ${tab === "items" ? orangeCard : "bg-white border border-neutral-200 text-neutral-800"}`}>Items</button>
+                <header className="mb-8 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-neutral-500">Admin Console</p>
+                            <h1 className="text-3xl font-bold">Dashboard</h1>
+                        </div>
+                        <div className="flex items-center gap-3 text-sm text-neutral-600 bg-white border border-neutral-200 px-3 py-2 rounded-full shadow-sm">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-700 font-semibold">A</span>
+                            <span>Signed in as Admin</span>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {[{ key: "overview", label: "Overview" }, { key: "users", label: "Users" }, { key: "bookings", label: "Bookings" }, { key: "items", label: "Items" }].map((t) => (
+                            <button
+                                key={t.key}
+                                onClick={() => setTab(t.key as TabKey)}
+                                className={`px-4 py-2 rounded-full text-sm font-semibold transition ${tab === t.key ? orangeCard : "bg-white border border-neutral-200 text-neutral-800 hover:bg-neutral-50"}`}
+                            >
+                                {t.label}
+                            </button>
+                        ))}
                     </div>
                 </header>
 
                 {tab === "overview" && (
-                    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[{ label: "Users", value: stats.users }, { label: "Bookings", value: stats.bookings }, { label: "Menu Items", value: stats.items }].map((s) => (
-                            <div key={s.label} className={`${orangeCard} rounded-xl p-5 shadow`}> 
-                                <div className="text-sm text-white/80">{s.label}</div>
-                                <div className="text-3xl font-bold mt-2">{s.value}</div>
+                    <div className="space-y-6">
+                        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[{ label: "Users", value: stats.users }, { label: "Bookings", value: stats.bookings }, { label: "Menu Items", value: stats.items }].map((s) => (
+                                <div key={s.label} className="rounded-xl p-5 shadow-sm bg-white border border-neutral-200">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm text-neutral-500">{s.label}</div>
+                                        <span className="px-2 py-1 text-xs rounded-full bg-orange-50 text-orange-700">Live</span>
+                                    </div>
+                                    <div className="text-3xl font-bold mt-2 text-neutral-900">{s.value}</div>
+                                    <div className="mt-2 h-1 rounded-full bg-orange-100">
+                                        <div className="h-full rounded-full bg-orange-500" style={{ width: `${Math.min(100, (Number(s.value) || 0) * 5)}%` }}></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </section>
+
+                        <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                            <div className="xl:col-span-2 bg-white border border-neutral-200 rounded-xl shadow-sm">
+                                <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-neutral-500">Health</p>
+                                        <h3 className="text-lg font-semibold text-neutral-900">Operational Snapshot</h3>
+                                    </div>
+                                    <span className="text-xs text-neutral-500">Auto-refresh on load</span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4">
+                                    {[{
+                                        label: "Pending",
+                                        value: bookingInsights.counts.pending,
+                                        tone: "bg-amber-50 text-amber-700",
+                                    }, {
+                                        label: "Dispatched",
+                                        value: bookingInsights.counts.dispatched,
+                                        tone: "bg-blue-50 text-blue-700",
+                                    }, {
+                                        label: "Delivered",
+                                        value: bookingInsights.counts.delivered,
+                                        tone: "bg-emerald-50 text-emerald-700",
+                                    }, {
+                                        label: "Active Bookings",
+                                        value: bookingInsights.active,
+                                        tone: "bg-orange-50 text-orange-700",
+                                    }, {
+                                        label: "Cancelled",
+                                        value: bookingInsights.counts.cancelled,
+                                        tone: "bg-rose-50 text-rose-700",
+                                    }, {
+                                        label: "Cancellation Rate",
+                                        value: `${bookingInsights.cancellationRate}%`,
+                                        tone: "bg-neutral-50 text-neutral-700",
+                                    }].map((card) => (
+                                        <div key={card.label} className={`rounded-lg border border-neutral-200 px-3 py-3 ${card.tone}`}>
+                                            <p className="text-xs uppercase tracking-wide">{card.label}</p>
+                                            <p className="text-2xl font-bold mt-1">{card.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3 px-4 pb-4 text-sm">
+                                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white font-semibold shadow-sm">
+                                        <span>Total Revenue</span>
+                                        <span className="text-lg">{formatINR(bookingInsights.revenue)}</span>
+                                    </div>
+                                    <span className="text-neutral-600">Tracking based on loaded bookings</span>
+                                </div>
                             </div>
-                        ))}
-                    </section>
+
+                            <div className="space-y-4">
+                                <div className="bg-white border border-neutral-200 rounded-xl shadow-sm flex flex-col">
+                                    <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
+                                        <h3 className="text-lg font-semibold">Recent Bookings</h3>
+                                        <span className="text-xs text-neutral-500">Last 5</span>
+                                    </div>
+                                    <div className="divide-y divide-neutral-100">
+                                        {bookingInsights.recent.length === 0 && <div className="px-4 py-6 text-sm text-neutral-500">No bookings yet.</div>}
+                                        {bookingInsights.recent.map((b) => {
+                                            const status = normalizeBookingStatus(b);
+                                            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+                                            return (
+                                                <div key={b._id} className="px-4 py-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="font-semibold text-neutral-900">{b.packageName || b.package || "Package"}</p>
+                                                            <p className="text-xs text-neutral-500">{b.day || "—"}{b.time ? ` • ${b.time}` : ""}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-sm font-semibold text-neutral-900">{formatINR(Number(b.total || 0))}</p>
+                                                            <p className="text-xs text-neutral-500">{b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ""}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-2 inline-flex px-2 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700">{statusLabel}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white border border-neutral-200 rounded-xl shadow-sm p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-wide text-neutral-500">Bookings</p>
+                                            <h3 className="text-lg font-semibold text-neutral-900">10-day trend</h3>
+                                        </div>
+                                        <span className="text-xs text-neutral-500">Sparkline</span>
+                                    </div>
+                                    <div className="h-36">
+                                        <svg viewBox="0 0 100 60" preserveAspectRatio="none" className="w-full h-full text-orange-600">
+                                            <polyline
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                points={bookingTrend.points.map((p) => `${p.x},${(p.y / 100) * 60}`).join(" ") || "0,60 100,60"}
+                                            />
+                                            {bookingTrend.points.map((p) => (
+                                                <circle key={p.key} cx={p.x} cy={(p.y / 100) * 60} r={1.4} fill="currentColor" />
+                                            ))}
+                                        </svg>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-neutral-600 mt-2">
+                                        <span>{bookingTrend.days[0]?.label}</span>
+                                        <span>{bookingTrend.days[bookingTrend.days.length - 1]?.label}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
                 )}
 
                 {tab === "users" && (
@@ -418,26 +666,32 @@ export default function AdminDashboardPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {bookings.map((b) => (
-                                            <tr key={b._id} className="border-t border-neutral-100">
-                                                <td className="px-4 py-3 font-medium">{b.packageName || b.package || "—"}</td>
-                                                <td className="px-4 py-3 text-neutral-700">{b.day || "—"} {b.time ? `• ${b.time}` : ""}</td>
-                                                <td className="px-4 py-3 text-neutral-900">₹{Number(b.total || 0).toFixed(2)}</td>
-                                                <td className="px-4 py-3"><span className="inline-flex px-2 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700">{b.status || "pending"}</span></td>
-                                                <td className="px-4 py-3 text-neutral-700">{b.userId || "—"}</td>
-                                                <td className="px-4 py-3 text-neutral-600">{b.createdAt ? new Date(b.createdAt).toLocaleString() : "—"}</td>
-                                                <td className="px-4 py-3 text-right flex justify-end gap-2">
-                                                    <select
-                                                        value={b.status || 'pending'}
-                                                        onChange={(e) => updateBookingStatus(b._id, e.target.value)}
-                                                        className="border rounded px-2 py-1 text-xs"
-                                                    >
-                                                        {['pending','accepted','dispatched','delivered','cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
-                                                    </select>
-                                                    <button onClick={() => cancelBooking(b._id)} className="text-xs text-red-600 hover:underline">Cancel</button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {bookings.map((b) => {
+                                            const rawStatus = (b.status || (b as any).bookingStatus || (b as any).orderStatus || 'pending').toString().toLowerCase();
+                                            const allowed = ['pending','accepted','dispatched','delivered','cancelled'];
+                                            const status = allowed.includes(rawStatus) ? rawStatus : 'pending';
+                                            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+                                            return (
+                                                <tr key={b._id} className="border-t border-neutral-100">
+                                                    <td className="px-4 py-3 font-medium">{b.packageName || b.package || "—"}</td>
+                                                    <td className="px-4 py-3 text-neutral-700">{b.day || "—"} {b.time ? `• ${b.time}` : ""}</td>
+                                                    <td className="px-4 py-3 text-neutral-900">₹{Number(b.total || 0).toFixed(2)}</td>
+                                                    <td className="px-4 py-3"><span className="inline-flex px-2 py-1 rounded-full text-xs bg-neutral-100 text-neutral-700">{statusLabel}</span></td>
+                                                    <td className="px-4 py-3 text-neutral-700">{b.userId || "—"}</td>
+                                                    <td className="px-4 py-3 text-neutral-600">{b.createdAt ? new Date(b.createdAt).toLocaleString() : "—"}</td>
+                                                    <td className="px-4 py-3 text-right flex justify-end gap-2">
+                                                        <select
+                                                            value={status}
+                                                            onChange={(e) => updateBookingStatus(b._id, e.target.value)}
+                                                            className="border rounded px-2 py-1 text-xs"
+                                                        >
+                                                            {['pending','accepted','dispatched','delivered','cancelled'].map((s) => <option key={s} value={s}>{s}</option>)}
+                                                        </select>
+                                                        <button onClick={() => cancelBooking(b._id)} className="text-xs text-red-600 hover:underline">Cancel</button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -459,6 +713,7 @@ export default function AdminDashboardPage() {
                                     <table className="min-w-full text-sm">
                                         <thead className="bg-neutral-100 text-neutral-700">
                                             <tr>
+                                                <th className="text-left px-4 py-3">Image</th>
                                                 <th className="text-left px-4 py-3">Name</th>
                                                 <th className="text-left px-4 py-3">Category</th>
                                                 <th className="text-left px-4 py-3">Price</th>
@@ -469,6 +724,16 @@ export default function AdminDashboardPage() {
                                         <tbody>
                                             {items.map((it) => (
                                                 <tr key={it._id || it.id} className="border-t border-neutral-100">
+                                                    <td className="px-4 py-3">
+                                                        {resolveImageSrc(it.image) ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img src={resolveImageSrc(it.image)} alt={it.name || it.title || "item"} className="h-12 w-16 object-cover rounded border" />
+                                                        ) : (
+                                                            <div className="h-12 w-16 rounded border bg-neutral-50 flex items-center justify-center text-xs text-neutral-500">
+                                                                {(it.name || it.title || "I").slice(0, 1).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td className="px-4 py-3 font-medium">{it.name || it.title || it.id}</td>
                                                     <td className="px-4 py-3 text-neutral-700">{it.category || "—"}</td>
                                                     <td className="px-4 py-3 text-neutral-900">₹{Number(it.price || 0).toFixed(2)}</td>
@@ -506,18 +771,17 @@ export default function AdminDashboardPage() {
                                             className="text-sm"
                                             onChange={(e) => {
                                                 const file = e.target.files?.[0];
-                                                if (!file) { setItemImagePreview(undefined); setItemForm((f) => ({ ...f, image: "" })); return; }
-                                                // Guard against very large files that could trigger 413 when sent as data URLs
-                                                const maxBytes = 1 * 1024 * 1024; // 1MB
-                                                if (file.size > maxBytes) {
-                                                    alert('Image too large. Please pick a file under 1MB.');
+                                                if (!file) { setItemImagePreview(undefined); setItemImageFile(undefined); return; }
+                                                // Guard against very large files; base64 adds ~33%, so keep well under 1MB
+                                                if (file.size > MAX_IMAGE_BYTES) {
+                                                    alert('Image too large. Please pick a file under 700KB.');
                                                     return;
                                                 }
                                                 const reader = new FileReader();
                                                 reader.onload = () => {
                                                     const dataUrl = reader.result as string;
                                                     setItemImagePreview(dataUrl);
-                                                    setItemForm((f) => ({ ...f, image: dataUrl }));
+                                                    setItemImageFile(file);
                                                 };
                                                 reader.readAsDataURL(file);
                                             }}
@@ -535,7 +799,16 @@ export default function AdminDashboardPage() {
                                     </div>
                                     <div>
                                         <label className="text-xs text-neutral-600">Category</label>
-                                        <input value={itemForm.category || ""} onChange={(e) => setItemForm((f) => ({ ...f, category: e.target.value }))} className="w-full border rounded px-3 py-2 mt-1" placeholder="Vegetarian" />
+                                        <select
+                                            value={itemForm.category || "veg"}
+                                            onChange={(e) => setItemForm((f) => ({ ...f, category: e.target.value }))}
+                                            className="w-full border rounded px-3 py-2 mt-1"
+                                        >
+                                            <option value="veg">Veg</option>
+                                            <option value="non-veg">Non Veg</option>
+                                            <option value="mixed">Mixed</option>
+                                            <option value="premium">Premium</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div>

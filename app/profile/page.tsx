@@ -1,13 +1,12 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { addAddress, changePassword, fetchAddresses, fetchProfile, updateProfile } from '../../lib/api';
+import { changePassword, fetchProfile, fetchUserById, updateProfile } from '../../lib/api';
 
 type Profile = {
   name?: string;
   fullName?: string;
   email?: string;
-  phone?: string;
 };
 
 export default function ProfilePage() {
@@ -17,13 +16,8 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-
-  const [addresses, setAddresses] = useState<string[]>([]);
-  const [newAddress, setNewAddress] = useState('');
-  const [addressMsg, setAddressMsg] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -36,25 +30,48 @@ export default function ProfilePage() {
     setLoading(true);
     setError(null);
 
-    Promise.all([
-      fetchProfile(),
-      fetchAddresses().catch(() => []),
-    ])
-      .then(([profile, addr]) => {
+    const load = async () => {
+      try {
+        const cachedUser = (() => {
+          try {
+            const raw = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+            return raw ? JSON.parse(raw) : null;
+          } catch {
+            return null;
+          }
+        })();
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+        const decodedId = (() => {
+          if (!token) return null;
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1] || ''));
+            return payload?.id || payload?._id || payload?.userId || payload?.sub || null;
+          } catch {
+            return null;
+          }
+        })();
+
+        const candidateId = cachedUser?._id || cachedUser?.id || decodedId;
+
+        const profile = candidateId && token
+          ? await fetchUserById(token, candidateId).then((r) => (r.ok ? (r.data?.data || r.data) : null)).catch(() => null)
+          : null;
+
+        const fallbackProfile = profile || await fetchProfile().catch(() => null) || cachedUser;
+
         if (!mounted) return;
-        setUser(profile || null);
-        setAddresses(Array.isArray(addr) ? addr : []);
-        setName(profile?.name || profile?.fullName || '');
-        setPhone(profile?.phone || '');
-      })
-      .catch(() => {
+        setUser(fallbackProfile || null);
+        setName(fallbackProfile?.name || fallbackProfile?.fullName || fallbackProfile?.username || '');
+      } catch (e) {
         if (!mounted) return;
         setError('Failed to load profile');
-      })
-      .finally(() => {
+      } finally {
         if (!mounted) return;
         setLoading(false);
-      });
+      }
+    };
+
+    load();
 
     return () => { mounted = false; };
   }, []);
@@ -86,29 +103,15 @@ export default function ProfilePage() {
     setSaving(true);
     setSaveMsg(null);
     try {
-      const res: any = await updateProfile({ name, phone });
+      const res: any = await updateProfile({ name });
       if (!res.ok) {
         setSaveMsg(res?.data?.message || res?.data?.error || 'Failed to update profile');
         return;
       }
       setSaveMsg('Profile updated');
-      setUser((u) => ({ ...(u || {}), name, phone }));
+      setUser((u) => ({ ...(u || {}), name }));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const onAddAddress = async () => {
-    const value = newAddress.trim();
-    if (!value) return;
-    setAddressMsg(null);
-    try {
-      await addAddress(value);
-      setAddresses((s) => [...s, value]);
-      setNewAddress('');
-      setAddressMsg('Address added');
-    } catch (e) {
-      setAddressMsg('Failed to add address');
     }
   };
 
@@ -169,15 +172,6 @@ export default function ProfilePage() {
                   placeholder="Your name"
                 />
               </div>
-              <div>
-                <label className="block text-sm text-neutral-600 mb-1">Phone</label>
-                <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full border border-neutral-300 rounded px-3 py-2"
-                  placeholder="Phone number"
-                />
-              </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm text-neutral-600 mb-1">Email</label>
                 <input
@@ -205,37 +199,7 @@ export default function ProfilePage() {
             <div className="mt-4 text-sm text-neutral-700 space-y-2">
               <div><span className="text-neutral-500">Name:</span> {displayName}</div>
               <div><span className="text-neutral-500">Email:</span> {user?.email || '-'}</div>
-              <div><span className="text-neutral-500">Phone:</span> {user?.phone || '-'}</div>
             </div>
-          </section>
-
-          <section className="lg:col-span-2 bg-white border border-neutral-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold">Addresses</h2>
-            <p className="text-sm text-neutral-500 mt-1">Manage delivery addresses.</p>
-
-            <div className="mt-4 space-y-2">
-              {addresses.length === 0 && (
-                <div className="text-sm text-neutral-600">No saved addresses yet.</div>
-              )}
-              {addresses.map((a, i) => (
-                <div key={`${a}-${i}`} className="text-sm text-neutral-800 border border-neutral-200 rounded px-3 py-2">
-                  {a}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex flex-col sm:flex-row gap-2">
-              <input
-                value={newAddress}
-                onChange={(e) => setNewAddress(e.target.value)}
-                placeholder="Add new address"
-                className="flex-1 border border-neutral-300 rounded px-3 py-2"
-              />
-              <button onClick={onAddAddress} className="px-4 py-2 rounded bg-neutral-900 text-white text-sm">
-                Add
-              </button>
-            </div>
-            {addressMsg && <div className="mt-2 text-sm text-neutral-600">{addressMsg}</div>}
           </section>
 
           <section className="bg-white border border-neutral-200 rounded-xl p-6">

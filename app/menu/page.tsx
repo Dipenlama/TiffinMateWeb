@@ -1,15 +1,14 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { API_BASE } from '../../lib/api';
 
 type MenuItem = { id: string; name: string; description?: string; price?: number; category?: string; image?: string; available?: boolean };
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80';
+const assetHost = API_BASE.replace(/\/api$/, "");
 
 export default function MenuPage() {
-  const router = useRouter();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [category, setCategory] = useState('All');
   const [search, setSearch] = useState('');
@@ -91,28 +90,6 @@ export default function MenuPage() {
 
   const visible = items; // items already filtered by API params
 
-  function quickBook(it: MenuItem) {
-    if (it.available === false) { alert('This item is currently unavailable.'); return; }
-    const price = Number(it.price || 99) || 99;
-    const booking = {
-      items: [{ id: it.id, name: it.name, qty: 1, price, subtotal: price }],
-      total: price,
-      day: 'Mon',
-      time: 'Lunch',
-      frequency: 'once',
-      draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      createdAt: new Date().toISOString(),
-      source: 'quick-book',
-    } as any;
-    try {
-      sessionStorage.setItem('bookingDraft', JSON.stringify(booking));
-      router.push('/packages/confirm');
-    } catch (e) {
-      console.error(e);
-      alert('Could not prepare booking draft');
-    }
-  }
-
   return (
     <main className="min-h-screen bg-orange-50">
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -130,8 +107,7 @@ export default function MenuPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="hidden md:block text-sm text-white/90 bg-white/10 px-3 py-2 rounded-lg border border-white/20 shadow-sm">Free delivery on orders above ₹299</div>
-              <Link href="/cart" className="px-4 py-2 bg-white text-orange-600 font-semibold rounded-lg shadow-lg hover:-translate-y-0.5 transition transform">View Cart</Link>
+              <div className="hidden md:block text-sm text-white/90 bg-white/10 px-3 py-2 rounded-lg border border-white/20 shadow-sm">Freshly cooked, zero prep</div>
             </div>
           </div>
         </header>
@@ -178,7 +154,7 @@ export default function MenuPage() {
                 <article key={it.id} className="bg-white rounded-2xl shadow-sm border border-neutral-100 hover:shadow-xl hover:-translate-y-1 transition overflow-hidden">
                   <div className="h-48 bg-neutral-100 overflow-hidden relative">
                     <img
-                      src={it.image ? (it.image.startsWith('http') ? it.image : `${API_BASE}${it.image}`) : `/assets/images/${(it.id||'placeholder').toString().split('-')[0]}.jpg`}
+                      src={it.image ? (it.image.startsWith('http') ? it.image : `${assetHost}/${it.image.replace(/^\/+/, '')}`) : `/assets/images/${(it.id||'placeholder').toString().split('-')[0]}.jpg`}
                       onError={(e)=>{(e.currentTarget as HTMLImageElement).src=FALLBACK_IMG;}}
                       alt={it.name}
                       className="w-full h-full object-cover"
@@ -202,13 +178,6 @@ export default function MenuPage() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex gap-2">
                         <Link href={`/menu/${it.id}`} className="px-3 py-2 border border-neutral-200 rounded-md text-sm text-neutral-800 hover:bg-neutral-50">View</Link>
-                        <button
-                          onClick={() => quickBook(it)}
-                          disabled={it.available === false}
-                          className={`px-3 py-2 rounded-md text-sm shadow-sm transition ${it.available === false ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed' : 'bg-orange-600 text-white hover:-translate-y-0.5'}`}
-                        >
-                          Quick Book
-                        </button>
                       </div>
                       <div className="text-[11px] text-neutral-500">ID: {it.id}</div>
                     </div>
@@ -228,12 +197,6 @@ export default function MenuPage() {
             </div>
           )}
         </section>
-
-        {/* Floating cart CTA for better visibility */}
-        <Link href="/cart" className="fixed right-6 bottom-6 md:right-10 md:bottom-10 px-4 py-3 bg-neutral-900 text-white rounded-full shadow-xl hidden md:flex items-center gap-3 hover:-translate-y-0.5 transition">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6h15l-1.5 9h-12L4 2H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          View Cart
-        </Link>
       </div>
     </main>
   );

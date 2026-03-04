@@ -75,10 +75,10 @@ export default function AdminPage() {
             <div style={{ flex: 1 }}>
               <label className={styles.labelSmall}>Product category</label>
               <select className={styles.select} value={vm.category} onChange={(e) => vm.setCategory(e.target.value)}>
-                <option value="main">Main</option>
-                <option value="starter">Starter</option>
-                <option value="dessert">Dessert</option>
-                <option value="drink">Drink</option>
+                <option value="veg">Veg</option>
+                <option value="non-veg">Non Veg</option>
+                <option value="mixed">Mixed</option>
+                <option value="premium">Premium</option>
               </select>
             </div>
 
