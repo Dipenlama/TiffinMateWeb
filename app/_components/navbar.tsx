@@ -43,6 +43,7 @@ export default function Navbar() {
             <Link href="/" className="hover:text-neutral-900">Home</Link>
             <Link href="/menu" className="hover:text-neutral-900">Menu</Link>
             <Link href="/bookings" className="hover:text-neutral-900">Bookings</Link>
+            <Link href="/about" className="hover:text-neutral-900">About Us</Link>
           </nav>
         </div>
 
@@ -55,12 +56,6 @@ export default function Navbar() {
               <span className="inline-block w-6 h-6 rounded-full bg-white/20" aria-hidden />
               <span>Profile</span>
             </Link>
-            <button
-              onClick={logout}
-              className="px-3 py-1 rounded-full border border-neutral-300 text-sm text-neutral-700 hover:bg-neutral-100"
-            >
-              Logout
-            </button>
           </div>
         )}
       </div>

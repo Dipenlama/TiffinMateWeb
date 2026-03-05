@@ -142,25 +142,26 @@ export default function ProfilePage() {
   };
 
   return (
-    <main className="max-w-5xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Profile</h1>
-          <p className="text-sm text-neutral-600">Manage your account and preferences.</p>
+    <div className="min-h-screen bg-neutral-50">
+      <main className="max-w-5xl mx-auto px-6 py-10">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-900">Profile</h1>
+            <p className="text-sm text-neutral-700">Manage your account and preferences.</p>
+          </div>
+          <button onClick={logout} className="px-4 py-2 rounded bg-neutral-900 text-white text-sm">
+            Logout
+          </button>
         </div>
-        <button onClick={logout} className="px-4 py-2 rounded bg-neutral-900 text-white text-sm">
-          Logout
-        </button>
-      </div>
 
       {loading && <div className="text-neutral-600">Loading profile…</div>}
       {!loading && error && <div className="text-red-600">{error}</div>}
 
       {!loading && !error && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="lg:col-span-2 bg-white border border-neutral-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold">Account Details</h2>
-            <p className="text-sm text-neutral-500 mt-1">Update your profile information.</p>
+          <section className="lg:col-span-2 bg-white border border-neutral-200 rounded-xl p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-neutral-900">Account Details</h2>
+            <p className="text-sm text-neutral-600 mt-1">Update your profile information.</p>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -168,7 +169,7 @@ export default function ProfilePage() {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-neutral-300 rounded px-3 py-2"
+                  className="w-full border border-neutral-300 rounded px-3 py-2 bg-white text-neutral-900 placeholder:text-neutral-400"
                   placeholder="Your name"
                 />
               </div>
@@ -177,7 +178,7 @@ export default function ProfilePage() {
                 <input
                   value={user?.email || ''}
                   readOnly
-                  className="w-full border border-neutral-200 bg-neutral-50 rounded px-3 py-2 text-neutral-600"
+                  className="w-full border border-neutral-200 bg-neutral-50 rounded px-3 py-2 text-neutral-800"
                 />
               </div>
             </div>
@@ -194,16 +195,16 @@ export default function ProfilePage() {
             </div>
           </section>
 
-          <section className="bg-white border border-neutral-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold">Quick Info</h2>
+          <section className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-neutral-900">Quick Info</h2>
             <div className="mt-4 text-sm text-neutral-700 space-y-2">
               <div><span className="text-neutral-500">Name:</span> {displayName}</div>
               <div><span className="text-neutral-500">Email:</span> {user?.email || '-'}</div>
             </div>
           </section>
 
-          <section className="bg-white border border-neutral-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold">Change Password</h2>
+          <section className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-neutral-900">Change Password</h2>
             <div className="mt-4 space-y-3">
               <div>
                 <label className="block text-sm text-neutral-600 mb-1">Current password</label>
@@ -211,7 +212,8 @@ export default function ProfilePage() {
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full border border-neutral-300 rounded px-3 py-2"
+                  className="w-full border border-neutral-300 rounded px-3 py-2 bg-white text-neutral-900 placeholder:text-neutral-400"
+                  placeholder="Enter current password"
                 />
               </div>
               <div>
@@ -220,7 +222,8 @@ export default function ProfilePage() {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full border border-neutral-300 rounded px-3 py-2"
+                  className="w-full border border-neutral-300 rounded px-3 py-2 bg-white text-neutral-900 placeholder:text-neutral-400"
+                  placeholder="Enter new password"
                 />
               </div>
               <div>
@@ -229,7 +232,8 @@ export default function ProfilePage() {
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full border border-neutral-300 rounded px-3 py-2"
+                  className="w-full border border-neutral-300 rounded px-3 py-2 bg-white text-neutral-900 placeholder:text-neutral-400"
+                  placeholder="Re-enter new password"
                 />
               </div>
             </div>
@@ -247,6 +251,7 @@ export default function ProfilePage() {
           </section>
         </div>
       )}
-    </main>
+      </main>
+    </div>
   );
 }
