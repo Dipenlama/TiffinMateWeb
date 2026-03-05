@@ -1,4 +1,4 @@
-declare const global: any;
+const globalAny: any = globalThis;
 
 describe('API_BASE derivation', () => {
   const originalEnv = { ...process.env };
@@ -41,7 +41,7 @@ describe('API_BASE derivation', () => {
 
 describe('auth API helpers', () => {
   beforeEach(() => {
-    global.fetch = jest.fn(async () => {
+    globalAny.fetch = jest.fn(async () => {
       return new Response(JSON.stringify({ success: true }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -56,7 +56,7 @@ describe('auth API helpers', () => {
   test('postForgotPassword posts email payload', async () => {
     const { postForgotPassword, API_BASE } = await import('../lib/api');
     await postForgotPassword('user@example.com');
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalAny.fetch).toHaveBeenCalledWith(
       `${API_BASE}/auth/forgot-password`,
       expect.objectContaining({
         method: 'POST',
@@ -69,7 +69,7 @@ describe('auth API helpers', () => {
   test('postResetPassword posts token and password', async () => {
     const { postResetPassword, API_BASE } = await import('../lib/api');
     await postResetPassword('tok123', 'new-pass');
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalAny.fetch).toHaveBeenCalledWith(
       `${API_BASE}/auth/reset-password`,
       expect.objectContaining({
         method: 'POST',
@@ -82,7 +82,7 @@ describe('auth API helpers', () => {
   test('postLogin posts email and password', async () => {
     const { postLogin, API_BASE } = await import('../lib/api');
     await postLogin('user@example.com', 'secret');
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(globalAny.fetch).toHaveBeenCalledWith(
       `${API_BASE}/auth/login`,
       expect.objectContaining({
         method: 'POST',
@@ -94,7 +94,7 @@ describe('auth API helpers', () => {
 
   test('changePassword posts to first non-404 endpoint', async () => {
     const calls: string[] = [];
-    global.fetch = jest
+    globalAny.fetch = jest
       .fn()
       .mockImplementationOnce(async (url: string) => {
         calls.push(url);
@@ -131,7 +131,7 @@ describe('fetchMenu behaviour', () => {
   test('fetchMenu falls back to /menu when /items fails', async () => {
     const first = new Response(JSON.stringify({ message: 'fail' }), { status: 500, headers: { 'content-type': 'application/json' } }) as any;
     const second = new Response(JSON.stringify({ data: [{ id: 1 }] }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
-    global.fetch = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    globalAny.fetch = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
     const { fetchMenu } = await import('../lib/api');
     const data = await fetchMenu();
     expect(global.fetch).toHaveBeenCalledTimes(2);
@@ -141,7 +141,7 @@ describe('fetchMenu behaviour', () => {
   test('fetchMenu throws when both endpoints fail', async () => {
     const first = new Response(JSON.stringify({ message: 'err1' }), { status: 500, headers: { 'content-type': 'application/json' } }) as any;
     const second = new Response(JSON.stringify({ message: 'err2' }), { status: 500, headers: { 'content-type': 'application/json' } }) as any;
-    global.fetch = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    globalAny.fetch = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
     const { fetchMenu } = await import('../lib/api');
     await expect(fetchMenu()).rejects.toThrow('err1');
   });
@@ -149,7 +149,7 @@ describe('fetchMenu behaviour', () => {
   test('fetchMenu handles non-JSON responses gracefully', async () => {
     const first = new Response('not-json', { status: 500 }) as any;
     const second = new Response('also-not-json', { status: 500 }) as any;
-    global.fetch = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+    globalAny.fetch = jest.fn().mockResolvedValueOnce(first).mockResolvedValueOnce(second);
     const { fetchMenu } = await import('../lib/api');
     await expect(fetchMenu()).rejects.toThrow();
   });
@@ -162,7 +162,7 @@ describe('createBooking helper', () => {
 
   test('createBooking posts to /bookings first', async () => {
     const calls: string[] = [];
-    global.fetch = jest.fn(async (url: string) => {
+    globalAny.fetch = jest.fn(async (url: string) => {
       calls.push(url);
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
     });
@@ -174,7 +174,7 @@ describe('createBooking helper', () => {
 
   test('createBooking skips endpoints that return 404', async () => {
     const calls: string[] = [];
-    global.fetch = jest
+    globalAny.fetch = jest
       .fn()
       .mockImplementationOnce(async (url: string) => {
         calls.push(url);
@@ -192,7 +192,7 @@ describe('createBooking helper', () => {
   });
 
   test('createBooking returns failure when all endpoints fail', async () => {
-    global.fetch = jest.fn(async () => {
+    globalAny.fetch = jest.fn(async () => {
       return new Response(JSON.stringify({ error: 'nope' }), { status: 500, headers: { 'content-type': 'application/json' } }) as any;
     });
     const { createBooking } = await import('../lib/api');
@@ -203,7 +203,7 @@ describe('createBooking helper', () => {
 
   test('createBooking attaches idempotency key header when provided', async () => {
     let lastHeaders: any;
-    global.fetch = jest.fn(async (_url: string, init: any) => {
+    globalAny.fetch = jest.fn(async (_url: string, init: any) => {
       lastHeaders = init.headers as Headers;
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
     });
