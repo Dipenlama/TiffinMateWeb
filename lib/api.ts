@@ -39,6 +39,18 @@ export async function postLogin(email: string, password: string) {
   return handleResp(res);
 }
 
+export async function postRegister(fullName: string, email: string, password: string, confirmPassword: string) {
+  // Backend expects `username` and `confirmPassword`, so map full name into
+  // username and send both password fields.
+  const payload = { username: fullName, name: fullName, fullName, email, password, confirmPassword };
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResp(res);
+}
+
 export async function fetchAdminUsers(token: string, page = 1, limit = 10) {
   const url = `${API_BASE}/admin/users?page=${page}&limit=${limit}`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });

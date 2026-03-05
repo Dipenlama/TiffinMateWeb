@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, User, Utensils } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { postRegister } from '../../../lib/api';
 
 const SignupPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -13,10 +14,13 @@ const SignupPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!fullName || !email || !password || !confirmPassword) {
       setError('Please fill all fields.');
       return;
@@ -26,8 +30,22 @@ const SignupPage: React.FC = () => {
       return;
     }
     setError(null);
-    // TODO: call signup API here, then route on success
-    router.push('/login');
+    setSuccess(null);
+    setIsSubmitting(true);
+
+    try {
+      await postRegister(fullName, email, password, confirmPassword);
+      setSuccess('Account created successfully. You can now log in.');
+      // Give the user a moment to see the success, then redirect
+      setTimeout(() => {
+        router.push('/login');
+      }, 800);
+    } catch (err: any) {
+      const message = err?.message || 'Signup failed. Please try again.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -143,11 +161,13 @@ const SignupPage: React.FC = () => {
             {/* Sign Up Button */}
             <button
               type="submit"
-              className="w-full bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors shadow-lg shadow-orange-200"
+              disabled={isSubmitting}
+              className="w-full bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-orange-700 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-lg shadow-orange-200"
             >
-              Sign Up
+              {isSubmitting ? 'Creating account...' : 'Sign Up'}
             </button>
             {error && <p className="text-sm text-red-600">{error}</p>}
+            {success && !error && <p className="text-sm text-emerald-600">{success}</p>}
           </form>
 
           <div className="mt-8 relative">
