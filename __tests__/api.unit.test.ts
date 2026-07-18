@@ -93,9 +93,16 @@ describe('auth API helpers', () => {
   });
 
   test('changePassword posts to first non-404 endpoint', async () => {
+    // changePassword is a cookie-authenticated mutating call, so it fetches a
+    // CSRF token first (see withCsrfHeader in lib/api.ts) before the actual
+    // fallback attempts - that's an extra leading fetch call to account for.
     const calls: string[] = [];
     globalAny.fetch = jest
       .fn()
+      .mockImplementationOnce(async (url: string) => {
+        calls.push(url);
+        return new Response(JSON.stringify({ csrfToken: 'test-csrf-token' }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
+      })
       .mockImplementationOnce(async (url: string) => {
         calls.push(url);
         return new Response(JSON.stringify({ message: 'missing' }), { status: 404, headers: { 'content-type': 'application/json' } }) as any;
@@ -107,8 +114,9 @@ describe('auth API helpers', () => {
 
     const { changePassword, API_BASE } = await import('../lib/api');
     const res = await changePassword('old', 'new');
-    expect(calls[0]).toBe(`${API_BASE}/auth/change-password`);
-    expect(calls[1]).toBe(`${API_BASE}/profile/change-password`);
+    expect(calls[0]).toBe(`${API_BASE}/auth/csrf-token`);
+    expect(calls[1]).toBe(`${API_BASE}/auth/change-password`);
+    expect(calls[2]).toBe(`${API_BASE}/profile/change-password`);
     expect(res.ok).toBe(true);
   });
 });
@@ -161,14 +169,20 @@ describe('createBooking helper', () => {
   });
 
   test('createBooking posts to /bookings first', async () => {
+    // The CSRF-token fetch (getCsrfToken in lib/api.ts) always runs before
+    // the booking-endpoint fallback attempts, so it's the first captured URL.
     const calls: string[] = [];
     globalAny.fetch = jest.fn(async (url: string) => {
       calls.push(url);
+      if (url.endsWith('/auth/csrf-token')) {
+        return new Response(JSON.stringify({ csrfToken: 'test-csrf-token' }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
+      }
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
     });
     const { createBooking, API_BASE } = await import('../lib/api');
     const res = await createBooking({ foo: 'bar' });
-    expect(calls[0]).toBe(`${API_BASE}/bookings`);
+    expect(calls[0]).toBe(`${API_BASE}/auth/csrf-token`);
+    expect(calls[1]).toBe(`${API_BASE}/bookings`);
     expect(res.ok).toBe(true);
   });
 
@@ -176,6 +190,10 @@ describe('createBooking helper', () => {
     const calls: string[] = [];
     globalAny.fetch = jest
       .fn()
+      .mockImplementationOnce(async (url: string) => {
+        calls.push(url);
+        return new Response(JSON.stringify({ csrfToken: 'test-csrf-token' }), { status: 200, headers: { 'content-type': 'application/json' } }) as any;
+      })
       .mockImplementationOnce(async (url: string) => {
         calls.push(url);
         return new Response(JSON.stringify({}), { status: 404, headers: { 'content-type': 'application/json' } }) as any;
@@ -186,8 +204,9 @@ describe('createBooking helper', () => {
       });
     const { createBooking, API_BASE } = await import('../lib/api');
     const res = await createBooking({ foo: 'bar' });
-    expect(calls[0]).toBe(`${API_BASE}/bookings`);
-    expect(calls[1]).toBe(`${API_BASE}/booking`);
+    expect(calls[0]).toBe(`${API_BASE}/auth/csrf-token`);
+    expect(calls[1]).toBe(`${API_BASE}/bookings`);
+    expect(calls[2]).toBe(`${API_BASE}/booking`);
     expect(res.ok).toBe(true);
   });
 
