@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { fetchAdminUsers, deleteAdminUser, API_BASE } from '../../../lib/api';
+import { fetchAdminUsers, deleteAdminUser, getCsrfToken, API_BASE } from '../../../lib/api';
+import { hasSessionMarker } from '../../../lib/session-markers';
 
 export default function AdminUsersPage() {
   const [usersData, setUsersData] = useState<any>(null);
@@ -9,7 +10,11 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [userForm, setUserForm] = useState({ username: '', email: '', password: '', confirmPassword: '', role: 'user' });
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+  // Real authorization is via the backend's httpOnly session cookie
+  // (credentials: 'include' below); this only checks the non-secret
+  // `logged_in` marker cookie set at login to decide whether to bother
+  // rendering the page at all (see lib/session-markers.ts).
+  const token = hasSessionMarker() ? 'session' : '';
 
   useEffect(() => {
     if (!token) {
@@ -62,7 +67,8 @@ export default function AdminUsersPage() {
       };
       const res = await fetch(`${API_BASE}/admin/users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await getCsrfToken() },
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));

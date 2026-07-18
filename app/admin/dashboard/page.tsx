@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { getCsrfToken } from "../../../lib/api";
+import { hasSessionMarker } from "../../../lib/session-markers";
 
 type User = {
     _id: string;
@@ -48,28 +50,30 @@ const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:5050/api
 const API_HOST = API_BASE.replace(/\/api$/, "");
 const MAX_IMAGE_BYTES = 700 * 1024; // keep below backend 1MB once base64 encoded
 
+// Real authorization now happens via the backend's httpOnly session cookie,
+// sent automatically by `credentials: 'include'` below - this function no
+// longer returns an actual bearer token (there isn't one for JS to read
+// anymore). It returns a truthy placeholder purely so the existing
+// `if (!token) return` guards throughout this page still gate correctly on
+// "is there a session" via the non-secret `logged_in` marker cookie set by
+// login/page.tsx (see lib/session-markers.ts).
 function getToken(): string | null {
-    if (typeof window === "undefined") return null;
-    const local = localStorage.getItem("token");
-    if (local) return local;
-    try {
-        const cookies = document.cookie.split(";").map((c) => c.trim());
-        const entry = cookies.find((c) => c.startsWith("auth_token=")) || cookies.find((c) => c.startsWith("token="));
-        if (entry) return entry.split("=")[1];
-    } catch {}
-    return null;
+    return hasSessionMarker() ? "session" : null;
 }
 
-async function apiGet(path: string, token: string) {
-    const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+async function apiGet(path: string, _token: string) {
+    const res = await fetch(`${API_BASE}${path}`, { credentials: "include" });
     const json = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data: json?.data ?? json };
 }
 
-async function apiSend(path: string, token: string, method: string, body?: any) {
+async function apiSend(path: string, _token: string, method: string, body?: any) {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (method !== "GET") headers["X-CSRF-Token"] = await getCsrfToken();
     const res = await fetch(`${API_BASE}${path}`, {
         method,
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers,
+        credentials: "include",
         body: body ? JSON.stringify(body) : undefined,
     });
     const json = await res.json().catch(() => ({}));
@@ -265,7 +269,8 @@ export default function AdminDashboardPage() {
             form.append('image', itemImageFile);
             res = await fetch(`${API_BASE}${path}`, {
                 method,
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { "X-CSRF-Token": await getCsrfToken() },
+                credentials: "include",
                 body: form,
             }).then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }));
         } else {

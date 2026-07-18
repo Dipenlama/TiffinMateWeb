@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { API_BASE } from "../../lib/api";
+import { hasSessionMarker } from "../../lib/session-markers";
 
 type Booking = {
   _id: string;
@@ -26,18 +27,12 @@ type PageData = {
   totalPages: number;
 };
 
+// Real authorization is the backend's httpOnly session cookie, sent via
+// `credentials: 'include'` below; this is only a UX shortcut to decide
+// whether to bother fetching at all before the backend would 401 anyway
+// (see lib/session-markers.ts).
 function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  const local = localStorage.getItem("token");
-  if (local) return local;
-  try {
-    const cookies = document.cookie.split(";").map((c) => c.trim());
-    const entry = cookies.find((c) => c.startsWith("auth_token=")) || cookies.find((c) => c.startsWith("token="));
-    if (entry) return entry.split("=")[1];
-  } catch {
-    return null;
-  }
-  return null;
+  return hasSessionMarker() ? "session" : null;
 }
 
 function getUser(): { _id?: string; role?: string } | null {
@@ -94,7 +89,7 @@ export default function BookingsPage() {
       setError(null);
       try {
         const res = await fetch(`${API_BASE}/bookings/user/${encodeURIComponent(userId)}?page=${page}&limit=${limit}`,
-          { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+          { credentials: "include", signal: controller.signal });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || json?.success === false) {
           if (res.status === 401 || res.status === 403) {

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { fetchUserById, updateUserById } from '@/lib/api';
+import { hasSessionMarker } from '@/lib/session-markers';
 
 export default function UserEditPage() {
   const params = useParams();
@@ -12,7 +13,9 @@ export default function UserEditPage() {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('user');
   const [message, setMessage] = useState<string | null>(null);
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+  // Real authorization is the backend's httpOnly session cookie; this is
+  // only a UX shortcut (see lib/session-markers.ts).
+  const token = hasSessionMarker() ? 'session' : '';
   const router = useRouter();
 
   useEffect(() => {
