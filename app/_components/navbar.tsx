@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { postLogout } from "../../lib/api";
+import { clearSessionMarkers } from "../../lib/session-markers";
 
 export default function Navbar() {
   const router = useRouter();
@@ -12,19 +14,21 @@ export default function Navbar() {
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/reset-password");
 
-  const logout = () => {
+  const logout = async () => {
     try {
-      localStorage.removeItem("token");
-      localStorage.removeItem("role");
-    } catch (e) {}
+      // The session lives in httpOnly cookies now, which frontend JS cannot
+      // read or clear itself (that's the whole point - see lib/api.ts). A
+      // real logout has to ask the backend to revoke the refresh token and
+      // clear the cookies via Set-Cookie; the previous client-only
+      // document.cookie-clearing approach silently did nothing for these.
+      await postLogout();
+    } catch (e) {
+      // Best-effort: even if the request fails, still send the user to
+      // /login rather than leaving them on a page that looks logged in.
+    }
+    clearSessionMarkers();
     try {
       sessionStorage.clear();
-    } catch (e) {}
-    try {
-      // expire auth cookies used by middleware
-      document.cookie = "auth_token=; Max-Age=0; path=/";
-      document.cookie = "token=; Max-Age=0; path=/";
-      document.cookie = "role=; Max-Age=0; path=/";
     } catch (e) {}
     // Use hard replace to prevent back navigation to protected pages
     try {
@@ -56,6 +60,12 @@ export default function Navbar() {
               <span className="inline-block w-6 h-6 rounded-full bg-white/20" aria-hidden />
               <span>Profile</span>
             </Link>
+            <button
+              onClick={logout}
+              className="px-3 py-1 rounded-full border border-neutral-300 text-neutral-700 text-sm hover:bg-neutral-100"
+            >
+              Logout
+            </button>
           </div>
         )}
       </div>

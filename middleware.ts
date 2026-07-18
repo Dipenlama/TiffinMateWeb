@@ -23,8 +23,21 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // support both legacy `token` and `auth_token`
-  const token = request.cookies.get('auth_token')?.value || request.cookies.get('token')?.value;
+  // IMPORTANT: the backend's httpOnly access_token/refresh_token cookies are
+  // set by localhost:5050 and therefore live in THAT origin's cookie jar -
+  // they are never attached to requests made to this frontend (localhost:3000)
+  // and so can never be read here, no matter how this middleware is written.
+  // (This is standard split-origin cookie scoping, not an httpOnly quirk.)
+  //
+  // So this middleware instead reads two small, non-secret marker cookies -
+  // `logged_in` and `role` - that the frontend itself sets on ITS OWN origin
+  // right after a successful login (see login/page.tsx) and clears on logout
+  // (see navbar.tsx). These carry no trust: they only drive which page to
+  // redirect to. Every real data request still goes through the backend's
+  // httpOnly session cookie and is authorized there regardless of what these
+  // markers say - a forged `logged_in=1` cookie gets you a page shell that
+  // immediately 401s on its first API call, nothing more.
+  const token = request.cookies.get('logged_in')?.value;
   const role = request.cookies.get('role')?.value;
 
   // Root route: send admins to admin dashboard, others to dashboard, unauthenticated to login
