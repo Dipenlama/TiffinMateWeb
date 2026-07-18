@@ -1,12 +1,23 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { changePassword, fetchProfile, fetchUserById, updateProfile } from '../../lib/api';
+import {
+  changePassword,
+  fetchProfile,
+  fetchUserById,
+  postLogout,
+  postMfaDisable,
+  postMfaSetup,
+  postMfaVerifySetup,
+  updateProfile,
+} from '../../lib/api';
+import { clearSessionMarkers } from '../../lib/session-markers';
 
 type Profile = {
   name?: string;
   fullName?: string;
   email?: string;
+  mfaEnabled?: boolean;
 };
 
 export default function ProfilePage() {
@@ -25,6 +36,16 @@ export default function ProfilePage() {
   const [pwMsg, setPwMsg] = useState<string | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
 
+  // MFA (TOTP) enrollment/disablement. `mfaSetupData` holds the QR code +
+  // secret while enrollment is in progress but not yet confirmed - MFA only
+  // actually turns on server-side once the user proves they can generate a
+  // valid code with an authenticator app (see confirmMfaSetup in the backend).
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaSetupData, setMfaSetupData] = useState<{ qrCodeDataUrl: string; secret: string } | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaMsg, setMfaMsg] = useState<string | null>(null);
+  const [mfaBusy, setMfaBusy] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     setLoading(true);
@@ -32,6 +53,11 @@ export default function ProfilePage() {
 
     const load = async () => {
       try {
+        // Identity now comes from the non-sensitive cached user object
+        // (see lib/session-markers.ts comment on login/page.tsx) or the
+        // /auth/me-style endpoints in fetchProfile() below - both of which
+        // rely on the backend's httpOnly session cookie for the actual
+        // authorization, not a JS-readable token.
         const cachedUser = (() => {
           try {
             const raw = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
@@ -40,21 +66,11 @@ export default function ProfilePage() {
             return null;
           }
         })();
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-        const decodedId = (() => {
-          if (!token) return null;
-          try {
-            const payload = JSON.parse(atob(token.split('.')[1] || ''));
-            return payload?.id || payload?._id || payload?.userId || payload?.sub || null;
-          } catch {
-            return null;
-          }
-        })();
 
-        const candidateId = cachedUser?._id || cachedUser?.id || decodedId;
+        const candidateId = cachedUser?._id || cachedUser?.id;
 
-        const profile = candidateId && token
-          ? await fetchUserById(token, candidateId).then((r) => (r.ok ? (r.data?.data || r.data) : null)).catch(() => null)
+        const profile = candidateId
+          ? await fetchUserById(undefined, candidateId).then((r) => (r.ok ? (r.data?.data || r.data) : null)).catch(() => null)
           : null;
 
         const fallbackProfile = profile || await fetchProfile().catch(() => null) || cachedUser;
@@ -62,6 +78,7 @@ export default function ProfilePage() {
         if (!mounted) return;
         setUser(fallbackProfile || null);
         setName(fallbackProfile?.name || fallbackProfile?.fullName || fallbackProfile?.username || '');
+        setMfaEnabled(Boolean(fallbackProfile?.mfaEnabled));
       } catch (e) {
         if (!mounted) return;
         setError('Failed to load profile');
@@ -80,17 +97,16 @@ export default function ProfilePage() {
     return user?.name || user?.fullName || 'User';
   }, [user]);
 
-  const logout = () => {
+  const logout = async () => {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('role');
+      // Revokes the server-side refresh token and clears the httpOnly
+      // cookies via Set-Cookie - client-side storage clearing alone (the
+      // previous implementation) cannot touch those cookies at all.
+      await postLogout();
     } catch (e) {}
+    clearSessionMarkers();
+    try { localStorage.removeItem('user'); } catch (e) {}
     try { sessionStorage.clear(); } catch (e) {}
-    try {
-      document.cookie = 'auth_token=; Max-Age=0; path=/';
-      document.cookie = 'token=; Max-Age=0; path=/';
-      document.cookie = 'role=; Max-Age=0; path=/';
-    } catch (e) {}
     try {
       window.location.replace('/login');
       return;
@@ -138,6 +154,59 @@ export default function ProfilePage() {
       setConfirmPassword('');
     } finally {
       setPwSaving(false);
+    }
+  };
+
+  const onStartMfaSetup = async () => {
+    setMfaMsg(null);
+    setMfaBusy(true);
+    try {
+      const res: any = await postMfaSetup();
+      if (!res?.data) {
+        setMfaMsg(res?.message || 'Failed to start MFA setup');
+        return;
+      }
+      setMfaSetupData(res.data);
+    } catch (err: any) {
+      setMfaMsg(err?.message || 'Failed to start MFA setup');
+    } finally {
+      setMfaBusy(false);
+    }
+  };
+
+  const onConfirmMfaSetup = async () => {
+    if (!mfaCode) return;
+    setMfaMsg(null);
+    setMfaBusy(true);
+    try {
+      await postMfaVerifySetup(mfaCode);
+      setMfaEnabled(true);
+      setMfaSetupData(null);
+      setMfaCode('');
+      setMfaMsg('Two-factor authentication is now enabled.');
+    } catch (err: any) {
+      setMfaMsg(err?.message || 'Invalid code - please try again.');
+    } finally {
+      setMfaBusy(false);
+    }
+  };
+
+  const onDisableMfa = async () => {
+    if (!mfaCode) {
+      setMfaMsg('Enter your current authenticator code to disable MFA.');
+      return;
+    }
+    setMfaMsg(null);
+    setMfaBusy(true);
+    try {
+      await postMfaDisable(mfaCode);
+      setMfaEnabled(false);
+      setMfaCode('');
+      setMfaMsg('Two-factor authentication has been disabled.');
+    } catch (err: any) {
+      setMfaMsg(err?.message || 'Invalid code - please try again.');
+    } finally {
+      setMfaBusy(false);
     }
   };
 
@@ -248,6 +317,103 @@ export default function ProfilePage() {
               </button>
               {pwMsg && <span className="text-sm text-neutral-600">{pwMsg}</span>}
             </div>
+          </section>
+
+          <section className="lg:col-span-3 bg-white border border-neutral-200 rounded-xl p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-neutral-900">Two-Factor Authentication</h2>
+                <p className="text-sm text-neutral-600 mt-1">
+                  Require a 6-digit code from an authenticator app (Google Authenticator, Authy, etc.) at login,
+                  in addition to your password.
+                </p>
+              </div>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  mfaEnabled ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-600'
+                }`}
+              >
+                {mfaEnabled ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+
+            {mfaMsg && <div className="mt-3 text-sm text-neutral-700">{mfaMsg}</div>}
+
+            {!mfaEnabled && !mfaSetupData && (
+              <div className="mt-4">
+                <button
+                  onClick={onStartMfaSetup}
+                  disabled={mfaBusy}
+                  className="px-4 py-2 rounded bg-orange-600 text-white text-sm disabled:opacity-60"
+                >
+                  {mfaBusy ? 'Starting…' : 'Enable two-factor authentication'}
+                </button>
+              </div>
+            )}
+
+            {!mfaEnabled && mfaSetupData && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+                <div>
+                  <p className="text-sm text-neutral-700 mb-2">
+                    Scan this QR code with your authenticator app, or enter the setup key manually:
+                  </p>
+                  {/* Backend-rendered PNG data URL - no client QR library needed */}
+                  <img src={mfaSetupData.qrCodeDataUrl} alt="MFA QR code" className="w-40 h-40 border rounded" />
+                  <p className="mt-2 text-xs text-neutral-500 break-all">Setup key: {mfaSetupData.secret}</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-neutral-600 mb-1">Enter the 6-digit code to confirm</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full border border-neutral-300 rounded px-3 py-2 bg-white text-neutral-900 tracking-widest"
+                    placeholder="123456"
+                  />
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={onConfirmMfaSetup}
+                      disabled={mfaBusy || mfaCode.length !== 6}
+                      className="px-4 py-2 rounded bg-orange-600 text-white text-sm disabled:opacity-60"
+                    >
+                      {mfaBusy ? 'Verifying…' : 'Confirm & enable'}
+                    </button>
+                    <button
+                      onClick={() => { setMfaSetupData(null); setMfaCode(''); setMfaMsg(null); }}
+                      className="px-4 py-2 rounded border text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mfaEnabled && (
+              <div className="mt-4 max-w-sm">
+                <label className="block text-sm text-neutral-600 mb-1">
+                  Enter a current authenticator code to disable
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                  className="w-full border border-neutral-300 rounded px-3 py-2 bg-white text-neutral-900 tracking-widest"
+                  placeholder="123456"
+                />
+                <button
+                  onClick={onDisableMfa}
+                  disabled={mfaBusy || mfaCode.length !== 6}
+                  className="mt-3 px-4 py-2 rounded border border-red-300 text-red-700 text-sm disabled:opacity-60 hover:bg-red-50"
+                >
+                  {mfaBusy ? 'Disabling…' : 'Disable two-factor authentication'}
+                </button>
+              </div>
+            )}
           </section>
         </div>
       )}
