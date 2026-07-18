@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { API_BASE } from "../../lib/api";
+import { hasSessionMarker } from "../../lib/session-markers";
 
 type Booking = {
   _id: string;
@@ -10,6 +11,7 @@ type Booking = {
   packageName?: string;
   day?: string;
   time?: string;
+  address?: string;
   items?: Array<{ id?: string; name?: string; qty?: number; price?: number; subtotal?: number }>;
   total?: number;
   status?: string;
@@ -25,18 +27,12 @@ type PageData = {
   totalPages: number;
 };
 
+// Real authorization is the backend's httpOnly session cookie, sent via
+// `credentials: 'include'` below; this is only a UX shortcut to decide
+// whether to bother fetching at all before the backend would 401 anyway
+// (see lib/session-markers.ts).
 function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  const local = localStorage.getItem("token");
-  if (local) return local;
-  try {
-    const cookies = document.cookie.split(";").map((c) => c.trim());
-    const entry = cookies.find((c) => c.startsWith("auth_token=")) || cookies.find((c) => c.startsWith("token="));
-    if (entry) return entry.split("=")[1];
-  } catch {
-    return null;
-  }
-  return null;
+  return hasSessionMarker() ? "session" : null;
 }
 
 function getUser(): { _id?: string; role?: string } | null {
@@ -93,7 +89,7 @@ export default function BookingsPage() {
       setError(null);
       try {
         const res = await fetch(`${API_BASE}/bookings/user/${encodeURIComponent(userId)}?page=${page}&limit=${limit}`,
-          { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+          { credentials: "include", signal: controller.signal });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || json?.success === false) {
           if (res.status === 401 || res.status === 403) {
@@ -164,6 +160,7 @@ export default function BookingsPage() {
                 <tr>
                   <th className="text-left px-4 py-3">Package</th>
                   <th className="text-left px-4 py-3">Day / Time</th>
+                  <th className="text-left px-4 py-3">Address</th>
                   <th className="text-left px-4 py-3">Total</th>
                   <th className="text-left px-4 py-3">Status</th>
                   <th className="text-left px-4 py-3">Created</th>
@@ -175,6 +172,7 @@ export default function BookingsPage() {
                   <tr key={bk._id} className="border-t border-neutral-100">
                     <td className="px-4 py-3 font-medium text-neutral-900">{bk.packageName || bk.package || '—'}</td>
                     <td className="px-4 py-3 text-neutral-700">{bk.day || '—'} {bk.time ? `• ${bk.time}` : ''}</td>
+                    <td className="px-4 py-3 text-neutral-700 max-w-xs whitespace-pre-wrap">{bk.address || (bk as any)?.meta?.address || '—'}</td>
                     <td className="px-4 py-3 text-neutral-900">₹{Number(bk.total || 0).toFixed(2)}</td>
                     <td className="px-4 py-3"><span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-700">{bk.status || 'pending'}</span></td>
                     <td className="px-4 py-3 text-neutral-600">{bk.createdAt ? new Date(bk.createdAt).toLocaleString() : '—'}</td>

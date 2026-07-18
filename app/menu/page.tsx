@@ -1,86 +1,94 @@
 'use client';
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { fetchMenu } from '../../lib/api';
+import { API_BASE } from '../../lib/api';
 
-type MenuItem = { id: string; title: string; description?: string; price?: number; category?: string };
+type MenuItem = { id: string; name: string; description?: string; price?: number; category?: string; image?: string; available?: boolean };
 
 const FALLBACK_IMG = 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80';
+const assetHost = API_BASE.replace(/\/api$/, "");
 
 export default function MenuPage() {
-  const router = useRouter();
   const [items, setItems] = useState<MenuItem[]>([]);
-  const [allItems, setAllItems] = useState<MenuItem[]>([]);
-  const [category, setCategory] = useState('All Meals');
+  const [category, setCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
-    fetchMenu()
-      .then((data) => {
-        if (!mounted) return;
-        const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
-        if (!list || list.length === 0) {
-          // fallback static items
-          const staticItems: MenuItem[] = [
-            { id: 'pasta', title: 'Creamy Alfredo Pasta', description: 'Rich creamy pasta with garlic and parsley', price: 199, category: 'Lunch' },
-            { id: 'casuals', title: 'Casuals Sandwich', description: 'Toasted sandwich with veggies and cheese', price: 129, category: 'Breakfast' },
-            { id: 'pasta-spicy', title: 'Spicy Tomato Pasta', description: 'Pasta in tangy tomato sauce', price: 189, category: 'Dinner' },
-          ];
-          setItems(staticItems);
-          setAllItems(staticItems);
-        } else {
-          setItems(list);
-          setAllItems(list);
+    let active = true;
+    const controller = new AbortController();
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const safePage = Math.max(1, Number(page) || 1);
+        const safeLimit = Math.min(50, Math.max(1, Number(limit) || 12));
+        const params = new URLSearchParams({ page: String(safePage), limit: String(safeLimit) });
+        if (search.trim()) params.set('q', search.trim());
+        if (category && category !== 'All') params.set('category', category);
+
+        const attemptPaths = [`${API_BASE}/items?${params.toString()}`, `${API_BASE}/menu`, `/api/items?${params.toString()}`, `/api/menu`];
+        let lastErr: string | null = null;
+
+        for (const url of attemptPaths) {
+          try {
+            const res = await fetch(url, { signal: controller.signal });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              lastErr = json?.message || json?.error || res.statusText;
+              continue;
+            }
+            const listRaw = Array.isArray(json?.data?.items) ? json.data.items : Array.isArray(json?.items) ? json.items : Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+            const normalized: MenuItem[] = (listRaw || []).map((it: any) => ({
+              id: it._id || it.id || it.name,
+              name: it.name || it.title || 'Item',
+              description: it.description,
+              price: it.price,
+              category: it.category,
+              image: it.image,
+              available: it.available !== false,
+            }));
+            const total = json?.data?.totalPages || json?.totalPages || json?.data?.total_pages || 1;
+            if (active) {
+              setItems(normalized);
+              setTotalPages(Math.max(1, total || 1));
+            }
+            return; // success
+          } catch (err: any) {
+            if (err?.name === 'AbortError') return;
+            lastErr = err?.message || 'Failed to load items';
+          }
         }
-      })
-      .catch(() => {
-        if (!mounted) return;
-        // on error, show static sample items
-        const fallback = [
-          { id: 'pasta', title: 'Creamy Alfredo Pasta', description: 'Rich creamy pasta with garlic and parsley', price: 199, category: 'Lunch' },
-          { id: 'casuals', title: 'Casuals Sandwich', description: 'Toasted sandwich with veggies and cheese', price: 129, category: 'Breakfast' },
-        ];
-        setItems(fallback);
-        setAllItems(fallback);
-      });
-    return () => { mounted = false; };
-  }, []);
 
-  const categories = ['All Meals', 'Breakfast', 'Lunch', 'Dinner'];
+        if (active) {
+          setError(lastErr || 'Failed to load items');
+          setItems([]);
+          setTotalPages(1);
+        }
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return;
+        if (active) { setError('Failed to load items'); setItems([]); setTotalPages(1); }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
 
-  const visible = useMemo(() => {
-    const base = category === 'All Meals' ? allItems : allItems.filter((it) => it.category === category);
-    if (!search.trim()) return base;
-    const q = search.trim().toLowerCase();
-    return base.filter((it) =>
-      (it.title || '').toLowerCase().includes(q) ||
-      (it.description || '').toLowerCase().includes(q) ||
-      (it.category || '').toLowerCase().includes(q)
-    );
-  }, [allItems, category, search]);
+    load();
+    return () => { active = false; controller.abort(); };
+  }, [page, limit, search, category]);
 
-  function quickBook(it: MenuItem) {
-    const price = Number(it.price || 99) || 99;
-    const booking = {
-      items: [{ id: it.id, name: it.title, qty: 1, price, subtotal: price }],
-      total: price,
-      day: 'Mon',
-      time: 'Lunch',
-      frequency: 'once',
-      draftId: `draft-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-      createdAt: new Date().toISOString(),
-      source: 'quick-book',
-    } as any;
-    try {
-      sessionStorage.setItem('bookingDraft', JSON.stringify(booking));
-      router.push('/packages/confirm');
-    } catch (e) {
-      console.error(e);
-      alert('Could not prepare booking draft');
-    }
-  }
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    items.forEach((it) => { if (it.category) cats.add(it.category); });
+    return ['All', ...Array.from(cats)];
+  }, [items]);
+
+  const visible = items; // items already filtered by API params
 
   return (
     <main className="min-h-screen bg-orange-50">
@@ -99,8 +107,7 @@ export default function MenuPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="hidden md:block text-sm text-white/90 bg-white/10 px-3 py-2 rounded-lg border border-white/20 shadow-sm">Free delivery on orders above ₹299</div>
-              <Link href="/cart" className="px-4 py-2 bg-white text-orange-600 font-semibold rounded-lg shadow-lg hover:-translate-y-0.5 transition transform">View Cart</Link>
+              <div className="hidden md:block text-sm text-white/90 bg-white/10 px-3 py-2 rounded-lg border border-white/20 shadow-sm">Freshly cooked, zero prep</div>
             </div>
           </div>
         </header>
@@ -113,10 +120,10 @@ export default function MenuPage() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-neutral-500"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" stroke="currentColor" strokeWidth="1.5"/><path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                 <input
                   aria-label="Search menu"
-                  placeholder="Pasta, thali, sandwich…"
+                  placeholder="Paneer, biryani, pasta…"
                   className="w-full bg-transparent outline-none text-neutral-800 placeholder:text-neutral-400"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => { setPage(1); setSearch(e.target.value); }}
                 />
               </div>
             </div>
@@ -127,7 +134,7 @@ export default function MenuPage() {
               {categories.map((c) => (
                 <button
                   key={c}
-                  onClick={() => setCategory(c)}
+                  onClick={() => { setCategory(c); setPage(1); }}
                   className={`px-3 py-1 rounded-full text-sm font-semibold transition ${category === c ? 'bg-neutral-900 text-white shadow-md' : 'text-neutral-700 bg-white border border-neutral-200 hover:bg-neutral-50'}`}>
                   {c}
                 </button>
@@ -137,17 +144,19 @@ export default function MenuPage() {
         </div>
 
         <section className="min-h-[40vh]">
-          {visible.length === 0 ? (
+          {error && <div className="text-center text-red-600 bg-white border border-red-200 rounded-2xl py-12" role="alert">{error}</div>}
+          {!error && loading && <div className="text-center text-neutral-600 bg-white border border-neutral-200 rounded-2xl py-12">Loading items…</div>}
+          {!error && !loading && visible.length === 0 ? (
             <div className="text-center text-neutral-600 bg-white border border-dashed border-neutral-200 rounded-2xl py-12">No items match your filters</div>
-          ) : (
+          ) : (!error && !loading) ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {visible.map((it) => (
                 <article key={it.id} className="bg-white rounded-2xl shadow-sm border border-neutral-100 hover:shadow-xl hover:-translate-y-1 transition overflow-hidden">
                   <div className="h-48 bg-neutral-100 overflow-hidden relative">
                     <img
-                      src={`/assets/images/${(it.id||'placeholder').toString().split('-')[0]}.jpg`}
+                      src={it.image ? (it.image.startsWith('http') ? it.image : `${assetHost}/${it.image.replace(/^\/+/, '')}`) : `/assets/images/${(it.id||'placeholder').toString().split('-')[0]}.jpg`}
                       onError={(e)=>{(e.currentTarget as HTMLImageElement).src=FALLBACK_IMG;}}
-                      alt={it.title}
+                      alt={it.name}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute top-3 left-3 bg-white/85 backdrop-blur text-xs px-3 py-1 rounded-full border border-neutral-200">{it.category || 'Featured'}</div>
@@ -155,19 +164,20 @@ export default function MenuPage() {
                   <div className="p-5 flex flex-col gap-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <h3 className="text-lg font-semibold text-neutral-900 leading-snug">{it.title}</h3>
+                        <h3 className="text-lg font-semibold text-neutral-900 leading-snug">{it.name}</h3>
                         <p className="text-sm text-neutral-600 line-clamp-2">{it.description || 'Freshly prepared meal crafted by our chefs.'}</p>
                       </div>
                       <div className="text-right ml-2 flex flex-col items-end">
-                        <div className="text-xl font-bold text-orange-600">₹{(it.price||0).toFixed(2)}</div>
-                        <div className="text-[11px] text-emerald-600 font-semibold mt-1 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-100">In stock</div>
+                        <div className="text-xl font-bold text-orange-600">₹{(Number(it.price||0)).toFixed(2)}</div>
+                        <div className={`text-[11px] font-semibold mt-1 px-2 py-1 rounded-full border ${it.available === false ? 'text-red-600 bg-red-50 border-red-100' : 'text-emerald-600 bg-emerald-50 border-emerald-100'}`}>
+                          {it.available === false ? 'Unavailable' : 'In stock'}
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex gap-2">
                         <Link href={`/menu/${it.id}`} className="px-3 py-2 border border-neutral-200 rounded-md text-sm text-neutral-800 hover:bg-neutral-50">View</Link>
-                        <button onClick={() => quickBook(it)} className="px-3 py-2 bg-orange-600 text-white rounded-md text-sm shadow-sm hover:-translate-y-0.5 transition">Quick Book</button>
                       </div>
                       <div className="text-[11px] text-neutral-500">ID: {it.id}</div>
                     </div>
@@ -175,14 +185,18 @@ export default function MenuPage() {
                 </article>
               ))}
             </div>
+          ) : null}
+          {!error && totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-3">
+              <button onClick={() => setPage((p) => Math.max(1, p-1))} disabled={page <= 1} className="px-3 py-2 border rounded disabled:opacity-50">Prev</button>
+              <div className="text-sm text-neutral-700">Page {page} / {totalPages}</div>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p+1))} disabled={page >= totalPages} className="px-3 py-2 border rounded disabled:opacity-50">Next</button>
+              <select value={limit} onChange={(e)=>{ setLimit(Number(e.target.value)||12); setPage(1); }} className="border rounded px-2 py-1 text-sm">
+                {[6,12,18,24].map((n)=> <option key={n} value={n}>{n}/page</option>)}
+              </select>
+            </div>
           )}
         </section>
-
-        {/* Floating cart CTA for better visibility */}
-        <Link href="/cart" className="fixed right-6 bottom-6 md:right-10 md:bottom-10 px-4 py-3 bg-neutral-900 text-white rounded-full shadow-xl hidden md:flex items-center gap-3 hover:-translate-y-0.5 transition">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 6h15l-1.5 9h-12L4 2H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          View Cart
-        </Link>
       </div>
     </main>
   );
